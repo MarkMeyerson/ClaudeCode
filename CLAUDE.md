@@ -4,6 +4,65 @@
 
 This repository serves as **training materials, example projects, and templates for teaching AI to SMBs and individuals** through SherpaTech.AI. Our goal is to provide clear, practical examples that demonstrate AI capabilities and best practices for real-world applications.
 
+## SherpaTech.AI Project Context
+
+### Our 6A Framework
+SherpaTech.AI guides organizations through AI adoption using our proven 6A Method:
+- **Assess**: Understand current state and AI readiness
+- **Align**: Strategic fit & governance frameworks
+- **Activate**: Build guardrails and responsible AI policies
+- **Accelerate**: Build team capability through training
+- **Apply**: Practical implementation of AI solutions
+- **Amplify**: Scale what works across the organization
+
+### Active Projects in This Repo
+
+#### 1. SherpaTech Copilot (Lead Gen)
+- **Purpose**: Book discovery calls + educate prospects on 6A Method
+- **Tech Stack**: Microsoft Copilot Studio
+- **Integration**: Responses stored in HubSpot
+- **Location**: `/projects/sherpatech-copilot/`
+
+#### 2. AI Readiness Assessment Bot
+- **Purpose**: Lead qualification + personalized AI readiness reports
+- **Tech Stack**: Web app (React/Node.js)
+- **Output**: PDF report + HubSpot lead scoring
+- **Features**:
+  - Interactive assessment questionnaire
+  - Scoring across 6A dimensions
+  - Personalized recommendations
+  - Automated HubSpot contact creation
+- **Location**: `/projects/ai-readiness-assessment/`
+
+#### 3. Client Success Story Curator
+- **Purpose**: Quick case study generation + LinkedIn content creation
+- **Tech Stack**: CLI tool or web app (Python/Node.js)
+- **Input**: Client project notes, outcomes, testimonials
+- **Output**:
+  - Formatted case study (PDF/Web)
+  - LinkedIn posts (multiple formats)
+  - Twitter/X threads
+  - Email newsletter content
+- **Location**: `/projects/client-story-curator/`
+
+### HubSpot Integration
+All lead-gen tools sync to HubSpot via API. Standard contact properties include:
+- **AI Readiness Score** (0-100): Composite score from assessment
+- **6A Phase of Interest**: Which phase resonates most with the lead
+- **Meeting Type**: Discovery, Demo, Training, or Consulting
+- **Industry Focus**: Primary industry vertical
+- **Team Size**: Company size for tailored recommendations
+- **Use Case Priority**: Top AI use case identified
+
+### Content Standards
+All projects and examples must reflect SherpaTech.AI's teaching philosophy:
+- **"Teach a person to fish"**: Focus on capability building, not dependency
+- **No hard selling**: Lead with education and value
+- **6A Method integration**: Reference relevant phases in every tool
+- **Practical over theoretical**: Show real-world applications
+- **Transparent about AI**: Explain what AI does and its limitations
+- **Ethical considerations**: Address bias, privacy, and responsible use
+
 ## Key Principles
 
 ### 1. Clean, Readable Code
@@ -160,6 +219,10 @@ OPENAI_API_KEY=your_openai_api_key_here
 # Anthropic API Configuration
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
+# HubSpot Integration (for lead-gen projects)
+HUBSPOT_API_KEY=your_hubspot_api_key_here
+HUBSPOT_PORTAL_ID=your_portal_id_here
+
 # Application Settings
 DEBUG_MODE=false
 LOG_LEVEL=info
@@ -203,8 +266,16 @@ LOG_LEVEL=info
 to generate text completions. Include error handling, environment
 variable usage, and comprehensive docstrings."
 
+"Build the AI Readiness Assessment Bot from the active projects list.
+It should be a React/Node.js web app that scores users across our 6A
+dimensions and creates HubSpot contacts with the results."
+
 "Add a new template for a FastAPI project with authentication,
 following the folder structure conventions in CLAUDE.md"
+
+"Create a CLI tool for the Client Success Story Curator that takes
+client project notes and generates formatted case studies and LinkedIn
+posts that reference our 6A Method."
 
 "Review the code in examples/data-processing for security issues
 and suggest improvements"
