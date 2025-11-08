@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { assessmentApi, AssessmentScore, DimensionScore } from '../services/api';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from 'recharts';
 
 const ResultsPage: React.FC = () => {
   const { assessmentId } = useParams<{ assessmentId: string }>();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<any>(null);
@@ -124,6 +125,14 @@ const ResultsPage: React.FC = () => {
               style={{ backgroundColor: phaseColor }}
             >
               {score.readinessPhase}
+            </div>
+            <div className="mt-6">
+              <button
+                onClick={() => navigate('/framework')}
+                className="text-white hover:text-blue-100 underline text-sm font-semibold"
+              >
+                Learn more about the 6A Framework
+              </button>
             </div>
           </div>
         </div>

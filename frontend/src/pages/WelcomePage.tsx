@@ -144,7 +144,7 @@ const WelcomePage: React.FC = () => {
           </div>
 
           {/* Info Banner */}
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-8">
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
@@ -157,6 +157,16 @@ const WelcomePage: React.FC = () => {
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* Framework Link */}
+          <div className="text-center mb-8">
+            <button
+              onClick={() => navigate('/framework')}
+              className="text-indigo-600 hover:text-indigo-800 font-semibold underline text-sm"
+            >
+              Learn about the 6A Framework
+            </button>
           </div>
 
           {/* Form */}
