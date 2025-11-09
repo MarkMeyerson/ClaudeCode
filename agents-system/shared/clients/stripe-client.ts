@@ -23,7 +23,7 @@ export function initStripeClient(): Stripe {
   }
 
   stripeClient = new Stripe(config.stripeApiKey, {
-    apiVersion: '2024-11-20.acacia',
+    apiVersion: '2023-10-16',
   });
 
   logger.info('Stripe client initialized');

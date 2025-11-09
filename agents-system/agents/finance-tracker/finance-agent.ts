@@ -339,7 +339,7 @@ export class FinanceAgent {
           total_revenue: totalRevenue,
           average_order_value: totalRevenue,
           purchase_frequency: customerSubs.length,
-          profitability_score,
+          profitability_score: profitabilityScore,
           segment,
         };
       });

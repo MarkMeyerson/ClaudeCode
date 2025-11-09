@@ -3,11 +3,28 @@
  * Monitors financial health, tracks revenue, and provides financial insights
  */
 
-import { initDatabase, createAgentExecution, updateAgentExecution } from '../../shared/database/db';
+// Load environment variables FIRST before any other imports
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Load .env from the agents-system root directory
+const envPath = path.resolve(__dirname, '../../.env');
+const result = dotenv.config({ path: envPath });
+
+if (result.error) {
+  console.error('ERROR: Failed to load .env file from:', envPath);
+  console.error('Error:', result.error.message);
+  console.error('\nPlease ensure .env file exists in the agents-system directory.');
+  process.exit(1);
+}
+
+console.log('✓ Environment variables loaded from:', envPath);
+
+import { initDatabase, createAgentExecution, updateAgentExecution, testConnection } from '../../shared/database/db';
 import { initStripeClient } from '../../shared/clients/stripe-client';
 import { initClaudeClient } from '../../shared/clients/claude-client';
 import { logger } from '../../shared/utils/logger';
-import { config } from '../../shared/utils/config';
+import { config, printConfig } from '../../shared/utils/config';
 import { AgentType, AgentStatus } from '../../shared/types';
 import { FinanceAgent } from './finance-agent';
 import { loadFinanceConfig } from './config';
@@ -25,12 +42,23 @@ export async function run(): Promise<FinancialReport> {
       environment: config.environment,
     });
 
+    // Print configuration for debugging
+    printConfig();
+
     // 1. Initialize infrastructure
     logger.info('Initializing infrastructure...');
 
     // Initialize database
     const db = initDatabase();
-    logger.info('Database connected');
+    logger.info('Database pool created');
+
+    // Test database connection
+    logger.info('Testing database connection...');
+    const connected = await testConnection();
+    if (!connected) {
+      throw new Error('Database connection test failed. Check your DATABASE_* credentials in .env file.');
+    }
+    logger.info('✓ Database connection verified');
 
     // Initialize Stripe client
     try {

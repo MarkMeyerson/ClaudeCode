@@ -3,7 +3,7 @@
  * PostgreSQL connection pool for all agents
  */
 
-import { Pool, PoolClient, QueryResult } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { config } from '../utils/config';
 import { logger } from '../utils/logger';
 import { AgentExecution, BusinessMetric, AgentStatus, AgentType } from '../types';
@@ -18,6 +18,30 @@ export function initDatabase(): Pool {
     return pool;
   }
 
+  // Log connection attempt for debugging
+  logger.info('Initializing database connection pool', {
+    host: config.database.host,
+    port: config.database.port,
+    database: config.database.database,
+    user: config.database.user,
+  });
+
+  // Validate database configuration before creating pool
+  if (!config.database.host || config.database.host === 'localhost') {
+    throw new Error(
+      'Database host is not configured or set to localhost. ' +
+      'Please ensure DATABASE_HOST is set in your .env file to your Supabase host: ' +
+      'db.woyiceldsaqpmsruzauh.supabase.co'
+    );
+  }
+
+  if (!config.database.password) {
+    throw new Error(
+      'Database password is not configured. ' +
+      'Please ensure DATABASE_PASSWORD is set in your .env file.'
+    );
+  }
+
   pool = new Pool({
     host: config.database.host,
     port: config.database.port,
@@ -26,16 +50,23 @@ export function initDatabase(): Pool {
     password: config.database.password,
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    connectionTimeoutMillis: 10000, // Increased for remote connections
+    ssl: {
+      rejectUnauthorized: false, // Required for Supabase
+    },
   });
 
   pool.on('error', (err) => {
-    logger.error('Unexpected database error', { error: err.message });
+    logger.error('Unexpected database error', {
+      error: err.message,
+      host: config.database.host,
+    });
   });
 
-  logger.info('Database connection pool initialized', {
+  logger.info('Database connection pool initialized successfully', {
     host: config.database.host,
     database: config.database.database,
+    port: config.database.port,
   });
 
   return pool;
@@ -65,7 +96,7 @@ export async function closeDatabase(): Promise<void> {
 /**
  * Execute a query with the pool
  */
-export async function query<T = any>(
+export async function query<T extends QueryResultRow = any>(
   text: string,
   params?: any[]
 ): Promise<QueryResult<T>> {
@@ -195,4 +226,66 @@ export async function getRecentExecutions(
   const result = await query<AgentExecution>(queryText, params);
 
   return result.rows;
+}
+
+/**
+ * Test database connection with retry
+ */
+export async function testConnection(maxRetries: number = 3): Promise<boolean> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const dbPool = getPool();
+
+      logger.info(`Testing database connection (attempt ${attempt}/${maxRetries})...`);
+
+      const result = await dbPool.query('SELECT NOW() as now, current_database() as db, version() as version');
+
+      logger.info('✓ Database connection test successful', {
+        host: config.database.host,
+        database: result.rows[0].db,
+        serverTime: result.rows[0].now,
+        postgresVersion: result.rows[0].version.split(' ')[1],
+      });
+
+      return true;
+    } catch (error: any) {
+      lastError = error;
+
+      logger.warn(`Database connection test failed (attempt ${attempt}/${maxRetries})`, {
+        error: error.message,
+        code: error.code,
+        host: config.database.host,
+        database: config.database.database,
+      });
+
+      // Don't retry on authentication errors
+      if (error.code === '28P01' || error.code === '3D000') {
+        break;
+      }
+
+      // Wait before retrying (exponential backoff)
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000;
+        logger.info(`Waiting ${delay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  // All attempts failed
+  logger.error('Database connection failed after all retries', {
+    error: lastError?.message,
+    code: (lastError as any)?.code,
+    host: config.database.host,
+    troubleshooting: {
+      dnsIssue: lastError?.message.includes('ENOTFOUND') ? 'Check if the hostname is correct and accessible' : null,
+      authIssue: (lastError as any)?.code === '28P01' ? 'Check DATABASE_USER and DATABASE_PASSWORD' : null,
+      dbNotFound: (lastError as any)?.code === '3D000' ? 'Check DATABASE_NAME exists' : null,
+      firewall: lastError?.message.includes('ETIMEDOUT') ? 'Check firewall rules and network connectivity' : null,
+    },
+  });
+
+  return false;
 }
