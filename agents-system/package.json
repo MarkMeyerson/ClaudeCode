@@ -1,0 +1,50 @@
+{
+  "name": "@sherpatech/multi-agent-system",
+  "version": "1.0.0",
+  "description": "SherpaTech.AI Multi-Agent Business Automation System",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node-dev --respawn --transpile-only",
+    "finance-tracker": "ts-node agents/finance-tracker/index.ts",
+    "test": "ts-node shared/test-runner.ts",
+    "test:finance-tracker": "ts-node agents/finance-tracker/test.ts",
+    "db:migrate": "psql -U postgres -d ai_assessment -f shared/database/schema.sql",
+    "clean": "rm -rf dist",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write \"**/*.ts\""
+  },
+  "keywords": [
+    "ai",
+    "automation",
+    "multi-agent",
+    "finance",
+    "sherpatech"
+  ],
+  "author": "SherpaTech.AI",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.1",
+    "stripe": "^14.21.0",
+    "pg": "^8.11.3",
+    "dotenv": "^16.3.1",
+    "axios": "^1.6.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/pg": "^8.10.9",
+    "@types/uuid": "^9.0.7",
+    "typescript": "^5.3.2",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "prettier": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
