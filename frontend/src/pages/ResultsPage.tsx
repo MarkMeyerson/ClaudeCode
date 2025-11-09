@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { assessmentApi, AssessmentScore, DimensionScore } from '../services/api';
-import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from 'recharts';
+import { assessmentApi, DimensionScore } from '../services/api';
+import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 
 const ResultsPage: React.FC = () => {
   const { assessmentId } = useParams<{ assessmentId: string }>();
@@ -162,7 +162,7 @@ const ResultsPage: React.FC = () => {
                 <YAxis type="category" dataKey="name" width={150} style={{ fontSize: '11px' }} />
                 <Tooltip />
                 <Bar dataKey="score" fill="#667eea" radius={[0, 8, 8, 0]}>
-                  {barData.map((entry, index) => (
+                  {barData.map((entry: any, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.percentage >= 70 ? '#10b981' : entry.percentage >= 50 ? '#f59e0b' : '#ef4444'} />
                   ))}
                 </Bar>

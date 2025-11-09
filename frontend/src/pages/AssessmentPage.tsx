@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { assessmentApi, Question, Dimension, AssessmentResponse } from '../services/api';
+import { assessmentApi, Dimension, AssessmentResponse } from '../services/api';
 
 const AssessmentPage: React.FC = () => {
   const navigate = useNavigate();
