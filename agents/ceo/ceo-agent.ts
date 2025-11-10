@@ -16,12 +16,21 @@ import {
   SystemHealth,
   AgentHealthCheck,
   HealthStatus,
+  Recommendation,
+  FounderMood,
+  TaskComplexity,
+  FinancialMetrics,
+  SalesMetrics,
+  OperationsMetrics,
+  MarketingMetrics,
+  HRMetrics,
+  CustomerSuccessMetrics,
 } from './types';
 import { getConfig, defaultStrategicGoals } from './config';
 import { selectTopPriorities } from './algorithms/priority-calculator';
 import { detectRisks } from './lib/risk-detector';
 import { generateBriefing } from './lib/briefing-generator';
-import { createNotionIntegration } from './integrations/notion';
+import { createNotionIntegration, NotionIntegration } from './integrations/notion';
 
 /**
  * CEO Agent Class
@@ -37,7 +46,7 @@ import { createNotionIntegration } from './integrations/notion';
  */
 export class CEOAgent {
   private config = getConfig();
-  private notion;
+  private notion: NotionIntegration | undefined;
 
   constructor() {
     // Initialize Notion integration if credentials provided
@@ -58,19 +67,6 @@ export class CEOAgent {
    *
    * @param options - Orchestration options
    * @returns Complete briefing with top priorities and insights
-   *
-   * @example
-   * ```typescript
-   * const ceo = new CEOAgent();
-   *
-   * // Generate today's briefing
-   * const briefing = await ceo.getDailyBriefing();
-   *
-   * // Save to Notion
-   * if (briefing.markdown) {
-   *   console.log(briefing.markdown);
-   * }
-   * ```
    */
   async getDailyBriefing(options?: OrchestrationOptions): Promise<Briefing> {
     const startTime = Date.now();
@@ -156,7 +152,7 @@ export class CEOAgent {
    */
   async orchestrateAgents(options?: OrchestrationOptions): Promise<AgentResults> {
     const enabledAgents = this.config.agents.filter(a => a.enabled);
-    const results: Partial<AgentResults> = {};
+    const results: Partial<Record<keyof AgentResults, AgentResponse | null>> = {};
 
     let successCount = 0;
     let failureCount = 0;
@@ -178,7 +174,14 @@ export class CEOAgent {
         const agentDuration = Date.now() - agentStart;
 
         if (result) {
-          results[agentConfig.name as keyof AgentResults] = result;
+          // Type-safe assignment
+          if (agentConfig.name === 'finance') results.finance = result;
+          else if (agentConfig.name === 'sales') results.sales = result;
+          else if (agentConfig.name === 'operations') results.operations = result;
+          else if (agentConfig.name === 'marketing') results.marketing = result;
+          else if (agentConfig.name === 'hr') results.hr = result;
+          else if (agentConfig.name === 'customerSuccess') results.customerSuccess = result;
+
           successCount++;
           console.log(`   ✓ ${agentConfig.name} completed in ${agentDuration}ms`);
         } else {
@@ -190,19 +193,29 @@ export class CEOAgent {
         console.error(`   ✗ ${agentConfig.name} failed:`, error);
 
         // Set null result for failed agent
-        results[agentConfig.name as keyof AgentResults] = null;
+        if (agentConfig.name === 'finance') results.finance = null;
+        else if (agentConfig.name === 'sales') results.sales = null;
+        else if (agentConfig.name === 'operations') results.operations = null;
+        else if (agentConfig.name === 'marketing') results.marketing = null;
+        else if (agentConfig.name === 'hr') results.hr = null;
+        else if (agentConfig.name === 'customerSuccess') results.customerSuccess = null;
       }
     }
 
     const totalTime = Date.now() - orchestrationStart;
 
     return {
-      ...results,
+      finance: results.finance ?? null,
+      sales: results.sales ?? null,
+      operations: results.operations ?? null,
+      marketing: results.marketing ?? null,
+      hr: results.hr ?? null,
+      customerSuccess: results.customerSuccess ?? null,
       aggregatedAt: new Date(),
       totalExecutionTime: totalTime,
       successfulAgents: successCount,
       failedAgents: failureCount,
-    } as AgentResults;
+    };
   }
 
   /**
@@ -213,9 +226,6 @@ export class CEOAgent {
    * @returns Agent response or null if failed
    */
   async callAgent(agentName: string, timeout: number): Promise<AgentResponse | null> {
-    // For now, only Finance Agent is implemented
-    // Others will be stubs
-
     try {
       const promise = this.executeAgent(agentName);
       const result = await this.withTimeout(promise, timeout);
@@ -232,27 +242,19 @@ export class CEOAgent {
    * @private
    */
   private async executeAgent(agentName: string): Promise<AgentResponse> {
-    const startTime = Date.now();
-
     switch (agentName) {
       case 'finance':
         return await this.callFinanceAgent();
-
       case 'sales':
         return this.getStubAgent('sales');
-
       case 'operations':
         return this.getStubAgent('operations');
-
       case 'marketing':
         return this.getStubAgent('marketing');
-
       case 'hr':
         return this.getStubAgent('hr');
-
       case 'customerSuccess':
         return this.getStubAgent('customerSuccess');
-
       default:
         throw new Error(`Unknown agent: ${agentName}`);
     }
@@ -303,7 +305,7 @@ export class CEOAgent {
    * @private
    */
   private getStubAgent(agentName: string): AgentResponse {
-    const stubData: Record<string, any> = {
+    const stubData: Record<string, { metrics: Record<string, any>; recommendations: Recommendation[] }> = {
       sales: {
         metrics: {
           pipelineValue: 250000,
@@ -417,12 +419,12 @@ export class CEOAgent {
     const overallHealthScore = 78; // Simplified - could be more complex
 
     return {
-      finance: results.finance?.metrics || this.getDefaultFinanceMetrics(),
-      sales: results.sales?.metrics || this.getDefaultSalesMetrics(),
-      operations: results.operations?.metrics || this.getDefaultOperationsMetrics(),
-      marketing: results.marketing?.metrics || this.getDefaultMarketingMetrics(),
-      hr: results.hr?.metrics || this.getDefaultHRMetrics(),
-      customerSuccess: results.customerSuccess?.metrics || this.getDefaultCustomerSuccessMetrics(),
+      finance: (results.finance?.metrics as FinancialMetrics) || this.getDefaultFinanceMetrics(),
+      sales: (results.sales?.metrics as SalesMetrics) || this.getDefaultSalesMetrics(),
+      operations: (results.operations?.metrics as OperationsMetrics) || this.getDefaultOperationsMetrics(),
+      marketing: (results.marketing?.metrics as MarketingMetrics) || this.getDefaultMarketingMetrics(),
+      hr: (results.hr?.metrics as HRMetrics) || this.getDefaultHRMetrics(),
+      customerSuccess: (results.customerSuccess?.metrics as CustomerSuccessMetrics) || this.getDefaultCustomerSuccessMetrics(),
       overallHealthScore,
       timestamp: new Date(),
     };
@@ -466,8 +468,8 @@ export class CEOAgent {
    *
    * @private
    */
-  private aggregateRecommendations(results: AgentResults): any[] {
-    const recs: any[] = [];
+  private aggregateRecommendations(results: AgentResults): Recommendation[] {
+    const recs: Recommendation[] = [];
 
     const agents = ['finance', 'sales', 'operations', 'marketing', 'hr', 'customerSuccess'] as const;
 
@@ -488,7 +490,7 @@ export class CEOAgent {
    */
   private async getFounderStatus(): Promise<{
     energy: number;
-    mood: any;
+    mood: FounderMood;
     blockers: string[];
     focusTimeAvailable: number;
   }> {
@@ -562,7 +564,7 @@ export class CEOAgent {
    *
    * @private
    */
-  private estimateRevenue(rec: any): number {
+  private estimateRevenue(rec: Recommendation): number {
     // Simple heuristics based on tags and source
     if (rec.tags?.includes('revenue')) return 50000;
     if (rec.tags?.includes('retention') && rec.source === 'customerSuccess') return 15000;
@@ -575,7 +577,7 @@ export class CEOAgent {
    *
    * @private
    */
-  private estimateDeadline(rec: any): Date {
+  private estimateDeadline(rec: Recommendation): Date {
     const now = new Date();
 
     if (rec.priority >= 9) {
@@ -594,35 +596,109 @@ export class CEOAgent {
    *
    * @private
    */
-  private estimateComplexity(rec: any): any {
+  private estimateComplexity(rec: Recommendation): TaskComplexity {
     if (rec.estimatedTime && rec.estimatedTime >= 4) return 'high';
     if (rec.estimatedTime && rec.estimatedTime >= 2) return 'medium';
     return 'low';
   }
 
-  // Default metrics for when agents fail
-  private getDefaultFinanceMetrics() {
-    return { mrr: 0, arr: 0, burnRate: 0, runway: 0, cashBalance: 0 };
+  /**
+   * Get default finance metrics when agent fails
+   *
+   * @private
+   */
+  private getDefaultFinanceMetrics(): FinancialMetrics {
+    return {
+      mrr: 0,
+      arr: 0,
+      burnRate: 0,
+      runway: 0,
+      cashBalance: 0,
+      revenueGrowth: 0,
+      churnMRR: 0,
+      newMRR: 0,
+    };
   }
 
-  private getDefaultSalesMetrics() {
-    return { pipelineValue: 0, activeDeals: 0, closedThisMonth: 0, conversionRate: 0, avgDealSize: 0 };
+  /**
+   * Get default sales metrics when agent fails
+   *
+   * @private
+   */
+  private getDefaultSalesMetrics(): SalesMetrics {
+    return {
+      pipelineValue: 0,
+      activeDeals: 0,
+      closedThisMonth: 0,
+      conversionRate: 0,
+      avgDealSize: 0,
+      stalledDeals: 0,
+      winRate: 0,
+    };
   }
 
-  private getDefaultOperationsMetrics() {
-    return { activeProjects: 0, onTrackProjects: 0, atRiskProjects: 0, teamUtilization: 0 };
+  /**
+   * Get default operations metrics when agent fails
+   *
+   * @private
+   */
+  private getDefaultOperationsMetrics(): OperationsMetrics {
+    return {
+      activeProjects: 0,
+      onTrackProjects: 0,
+      atRiskProjects: 0,
+      teamUtilization: 0,
+      sprintVelocity: 0,
+      blockers: 0,
+    };
   }
 
-  private getDefaultMarketingMetrics() {
-    return { websiteVisitors: 0, leads: 0, cac: 0, socialFollowers: 0, contentEngagement: 0 };
+  /**
+   * Get default marketing metrics when agent fails
+   *
+   * @private
+   */
+  private getDefaultMarketingMetrics(): MarketingMetrics {
+    return {
+      websiteVisitors: 0,
+      leads: 0,
+      cac: 0,
+      socialFollowers: 0,
+      contentEngagement: 0,
+      topChannel: 'none',
+    };
   }
 
-  private getDefaultHRMetrics() {
-    return { teamSize: 0, openRoles: 0, candidatesInPipeline: 0, avgTenure: 0, satisfactionScore: 0 };
+  /**
+   * Get default HR metrics when agent fails
+   *
+   * @private
+   */
+  private getDefaultHRMetrics(): HRMetrics {
+    return {
+      teamSize: 0,
+      openRoles: 0,
+      candidatesInPipeline: 0,
+      avgTenure: 0,
+      satisfactionScore: 0,
+      attritionRisk: 0,
+    };
   }
 
-  private getDefaultCustomerSuccessMetrics() {
-    return { activeCustomers: 0, nps: 0, churnRate: 0, atRiskCustomers: 0, avgResponseTime: 0 };
+  /**
+   * Get default customer success metrics when agent fails
+   *
+   * @private
+   */
+  private getDefaultCustomerSuccessMetrics(): CustomerSuccessMetrics {
+    return {
+      activeCustomers: 0,
+      nps: 0,
+      churnRate: 0,
+      atRiskCustomers: 0,
+      avgResponseTime: 0,
+      csat: 0,
+    };
   }
 
   /**

@@ -12,7 +12,6 @@ import {
   Recommendation,
   FounderMood,
 } from '../types';
-import { explainPriorityScore } from '../algorithms/priority-calculator';
 
 /**
  * Generate complete executive briefing

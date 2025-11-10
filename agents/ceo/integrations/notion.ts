@@ -419,4 +419,5 @@ export function createNotionIntegration(
   return new NotionIntegration(apiKey, businessTrackerDbId);
 }
 
+export { NotionIntegration };
 export default NotionIntegration;
