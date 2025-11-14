@@ -1,0 +1,425 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database - Primary data store
+  postgres:
+    image: postgres:16-alpine
+    container_name: naios-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: naios_platform
+      POSTGRES_USER: ${DB_USER:-naios_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ChangeMeInProduction!}
+      POSTGRES_MULTIPLE_DATABASES: assessment_db,donor_db,volunteer_db,grant_db,impact_db,financial_db,content_db,board_db,security_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./data/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - naios-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-naios_admin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis - Caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: naios-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-ChangeMeInProduction!}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - naios-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Elasticsearch - Full-text search and analytics
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: naios-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - naios-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # RabbitMQ - Message queue
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: naios-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-naios_admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-ChangeMeInProduction!}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - naios-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # MinIO - Object storage
+  minio:
+    image: minio/minio:latest
+    container_name: naios-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-naios_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-ChangeMeInProduction!}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - naios-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Assessment Engine Service
+  assessment-engine:
+    build:
+      context: ./services/assessment-engine
+      dockerfile: Dockerfile
+    container_name: naios-assessment-engine
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${DB_USER:-naios_admin}:${DB_PASSWORD:-ChangeMeInProduction!}@postgres:5432/assessment_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-ChangeMeInProduction!}@redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-naios_admin}:${RABBITMQ_PASSWORD:-ChangeMeInProduction!}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET}
+      API_KEY_SECRET: ${API_KEY_SECRET}
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+      - rabbitmq
+    networks:
+      - naios-network
+
+  # Donor Management Service
+  donor-management:
+    build:
+      context: ./services/donor-management
+      dockerfile: Dockerfile
+    container_name: naios-donor-management
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      DATABASE_URL: postgresql://${DB_USER:-naios_admin}:${DB_PASSWORD:-ChangeMeInProduction!}@postgres:5432/donor_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-ChangeMeInProduction!}@redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-naios_admin}:${RABBITMQ_PASSWORD:-ChangeMeInProduction!}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      HUBSPOT_API_KEY: ${HUBSPOT_API_KEY}
+    ports:
+      - "3002:3002"
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+      - rabbitmq
+    networks:
+      - naios-network
+
+  # Volunteer Coordinator Service
+  volunteer-coordinator:
+    build:
+      context: ./services/volunteer-coordinator
+      dockerfile: Dockerfile
+    container_name: naios-volunteer-coordinator
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+      DATABASE_URL: postgresql://${DB_USER:-naios_admin}:${DB_PASSWORD:-ChangeMeInProduction!}@postgres:5432/volunteer_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-ChangeMeInProduction!}@redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-naios_admin}:${RABBITMQ_PASSWORD:-ChangeMeInProduction!}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "3003:3003"
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+      - rabbitmq
+    networks:
+      - naios-network
+
+  # Grant Intelligence Service
+  grant-intelligence:
+    build:
+      context: ./services/grant-intelligence
+      dockerfile: Dockerfile
+    container_name: naios-grant-intelligence
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3004
+      DATABASE_URL: postgresql://${DB_USER:-naios_admin}:${DB_PASSWORD:-ChangeMeInProduction!}@postgres:5432/grant_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-ChangeMeInProduction!}@redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-naios_admin}:${RABBITMQ_PASSWORD:-ChangeMeInProduction!}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    ports:
+      - "3004:3004"
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+      - rabbitmq
+    networks:
+      - naios-network
+
+  # Impact Analytics Service
+  impact-analytics:
+    build:
+      context: ./services/impact-analytics
+      dockerfile: Dockerfile
+    container_name: naios-impact-analytics
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3005
+      DATABASE_URL: postgresql://${DB_USER:-naios_admin}:${DB_PASSWORD:-ChangeMeInProduction!}@postgres:5432/impact_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-ChangeMeInProduction!}@redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-naios_admin}:${RABBITMQ_PASSWORD:-ChangeMeInProduction!}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "3005:3005"
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+      - rabbitmq
+    networks:
+      - naios-network
+
+  # Financial Hub Service
+  financial-hub:
+    build:
+      context: ./services/financial-hub
+      dockerfile: Dockerfile
+    container_name: naios-financial-hub
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3006
+      DATABASE_URL: postgresql://${DB_USER:-naios_admin}:${DB_PASSWORD:-ChangeMeInProduction!}@postgres:5432/financial_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-ChangeMeInProduction!}@redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-naios_admin}:${RABBITMQ_PASSWORD:-ChangeMeInProduction!}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET}
+      QUICKBOOKS_CLIENT_ID: ${QUICKBOOKS_CLIENT_ID}
+      QUICKBOOKS_CLIENT_SECRET: ${QUICKBOOKS_CLIENT_SECRET}
+    ports:
+      - "3006:3006"
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+      - rabbitmq
+    networks:
+      - naios-network
+
+  # Content Orchestrator Service
+  content-orchestrator:
+    build:
+      context: ./services/content-orchestrator
+      dockerfile: Dockerfile
+    container_name: naios-content-orchestrator
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3007
+      DATABASE_URL: postgresql://${DB_USER:-naios_admin}:${DB_PASSWORD:-ChangeMeInProduction!}@postgres:5432/content_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-ChangeMeInProduction!}@redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-naios_admin}:${RABBITMQ_PASSWORD:-ChangeMeInProduction!}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      MAILCHIMP_API_KEY: ${MAILCHIMP_API_KEY}
+    ports:
+      - "3007:3007"
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+      - rabbitmq
+    networks:
+      - naios-network
+
+  # Board Governance Service
+  board-governance:
+    build:
+      context: ./services/board-governance
+      dockerfile: Dockerfile
+    container_name: naios-board-governance
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3008
+      DATABASE_URL: postgresql://${DB_USER:-naios_admin}:${DB_PASSWORD:-ChangeMeInProduction!}@postgres:5432/board_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-ChangeMeInProduction!}@redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-naios_admin}:${RABBITMQ_PASSWORD:-ChangeMeInProduction!}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET}
+      ZOOM_API_KEY: ${ZOOM_API_KEY}
+    ports:
+      - "3008:3008"
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+      - rabbitmq
+    networks:
+      - naios-network
+
+  # Security Compliance Service
+  security-compliance:
+    build:
+      context: ./services/security-compliance
+      dockerfile: Dockerfile
+    container_name: naios-security-compliance
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3009
+      DATABASE_URL: postgresql://${DB_USER:-naios_admin}:${DB_PASSWORD:-ChangeMeInProduction!}@postgres:5432/security_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-ChangeMeInProduction!}@redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-naios_admin}:${RABBITMQ_PASSWORD:-ChangeMeInProduction!}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "3009:3009"
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+      - rabbitmq
+    networks:
+      - naios-network
+
+  # API Gateway (Nginx)
+  api-gateway:
+    image: nginx:alpine
+    container_name: naios-api-gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - assessment-engine
+      - donor-management
+      - volunteer-coordinator
+      - grant-intelligence
+      - impact-analytics
+      - financial-hub
+      - content-orchestrator
+      - board-governance
+      - security-compliance
+    networks:
+      - naios-network
+
+  # Prometheus - Metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: naios-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - naios-network
+
+  # Grafana - Metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: naios-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - naios-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  minio_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  naios-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16

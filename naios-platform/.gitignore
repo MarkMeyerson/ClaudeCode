@@ -1,0 +1,127 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
+# Production builds
+dist/
+build/
+.next/
+out/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# Editor directories and files
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Secrets
+secrets/
+credentials/
+*.credentials.json
+
+# Build artifacts
+*.tsbuildinfo
+.turbo/
+.cache/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Kubernetes secrets
+*-secret.yaml
+*-sealed-secret.yaml
+
+# AI/ML artifacts
+*.h5
+*.pkl
+*.pickle
+*.model
+*.weights
+models/cache/
+models/checkpoints/
+
+# Data files
+*.csv
+*.xlsx
+*.xls
+data/raw/
+data/processed/
+data/exports/
+
+# Documentation build
+docs/_build/
+docs/.doctrees/
+
+# Package manager
+.pnpm-store/
+.yarn/
+.npm/
+
+# Monitoring
+.prometheus/
+.grafana/
+
+# IDE
+*.code-workspace
