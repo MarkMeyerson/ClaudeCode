@@ -1,0 +1,98 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: naios-ingress
+  namespace: naios-platform
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, PUT, POST, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+spec:
+  tls:
+  - hosts:
+    - api.naios-platform.org
+    - app.naios-platform.org
+    secretName: naios-tls-secret
+  rules:
+  - host: api.naios-platform.org
+    http:
+      paths:
+      - path: /api/assessments
+        pathType: Prefix
+        backend:
+          service:
+            name: assessment-engine
+            port:
+              number: 3001
+      - path: /api/organizations
+        pathType: Prefix
+        backend:
+          service:
+            name: assessment-engine
+            port:
+              number: 3001
+      - path: /api/donors
+        pathType: Prefix
+        backend:
+          service:
+            name: donor-management
+            port:
+              number: 3002
+      - path: /api/donations
+        pathType: Prefix
+        backend:
+          service:
+            name: donor-management
+            port:
+              number: 3002
+      - path: /api/campaigns
+        pathType: Prefix
+        backend:
+          service:
+            name: donor-management
+            port:
+              number: 3002
+      - path: /api/volunteers
+        pathType: Prefix
+        backend:
+          service:
+            name: volunteer-coordinator
+            port:
+              number: 3003
+      - path: /api/grants
+        pathType: Prefix
+        backend:
+          service:
+            name: grant-intelligence
+            port:
+              number: 3004
+      - path: /api/impact
+        pathType: Prefix
+        backend:
+          service:
+            name: impact-analytics
+            port:
+              number: 3005
+      - path: /api/financial
+        pathType: Prefix
+        backend:
+          service:
+            name: financial-hub
+            port:
+              number: 3006
+  - host: app.naios-platform.org
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 80
