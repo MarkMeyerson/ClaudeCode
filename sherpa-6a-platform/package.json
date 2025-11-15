@@ -1,0 +1,60 @@
+{
+  "name": "sherpa-6a-platform",
+  "version": "1.0.0",
+  "description": "SherpaTech.AI 6A Method™ Complete Client Journey Platform",
+  "private": true,
+  "workspaces": [
+    "backend/services/*",
+    "backend/shared/*",
+    "frontend/*",
+    "analytics/ml-models"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm run install:backend && npm run install:frontend",
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend/client-portal && npm install && cd ../consultant-dashboard && npm install",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend/client-portal && npm run dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "npm run build:client-portal && npm run build:consultant-dashboard",
+    "build:client-portal": "cd frontend/client-portal && npm run build",
+    "build:consultant-dashboard": "cd frontend/consultant-dashboard && npm run build",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && npm run test",
+    "test:frontend": "npm run test:client-portal && npm run test:consultant-dashboard",
+    "test:client-portal": "cd frontend/client-portal && npm run test",
+    "test:consultant-dashboard": "cd frontend/consultant-dashboard && npm run test",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "db:migrate": "cd backend/shared/database && npm run migrate",
+    "db:seed": "cd backend/shared/database && npm run seed",
+    "db:reset": "cd backend/shared/database && npm run reset",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "k8s:deploy": "kubectl apply -f infrastructure/kubernetes/",
+    "deploy:production": "npm run build && npm run k8s:deploy"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.54.0",
+    "eslint-config-prettier": "^9.0.0",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MarkMeyerson/ClaudeCode.git"
+  },
+  "author": "SherpaTech.AI",
+  "license": "PROPRIETARY"
+}

@@ -1,0 +1,28 @@
+{
+  "name": "@sherpa-6a/database",
+  "version": "1.0.0",
+  "description": "Database schemas and migrations for 6A Platform",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "migrate": "node dist/migrations/migrate.js",
+    "migrate:up": "node dist/migrations/migrate.js up",
+    "migrate:down": "node dist/migrations/migrate.js down",
+    "seed": "node dist/seeds/seed.js",
+    "reset": "npm run migrate:down && npm run migrate:up && npm run seed",
+    "generate": "node dist/migrations/generate.js"
+  },
+  "dependencies": {
+    "pg": "^8.11.3",
+    "pg-hstore": "^2.3.4",
+    "typeorm": "^0.3.17",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/pg": "^8.10.9",
+    "@types/uuid": "^9.0.7",
+    "typescript": "^5.3.3"
+  }
+}
