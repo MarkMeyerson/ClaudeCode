@@ -1,0 +1,1067 @@
+openapi: 3.0.3
+info:
+  title: Non-Profit Intake Platform API
+  version: 2.0.0
+  description: |
+    Comprehensive API for the Non-Profit Assessment & Intake Platform.
+
+    This API provides endpoints for:
+    - Organization intake and management
+    - Intelligent assessments with AI routing
+    - Compliance tracking and monitoring
+    - Donor intelligence and relationship management
+    - Grant discovery and matching
+    - Financial health monitoring
+    - Risk management
+    - Capacity building
+
+    ## Authentication
+    All endpoints require JWT authentication via Bearer token in the Authorization header.
+
+    ## Rate Limiting
+    - Anonymous: 100 requests/hour
+    - Authenticated: 1000 requests/hour
+    - Premium: 10000 requests/hour
+
+  contact:
+    name: API Support
+    email: api@nonprofitintake.org
+    url: https://docs.nonprofitintake.org
+  license:
+    name: Proprietary
+    url: https://nonprofitintake.org/license
+
+servers:
+  - url: https://api.nonprofitintake.org/v2
+    description: Production server
+  - url: https://staging-api.nonprofitintake.org/v2
+    description: Staging server
+  - url: http://localhost:3001/api/v2
+    description: Local development server
+
+tags:
+  - name: Organizations
+    description: Organization intake and management
+  - name: Assessments
+    description: Intelligent assessment system
+  - name: Compliance
+    description: Compliance tracking and monitoring
+  - name: Donors
+    description: Donor intelligence and management
+  - name: Grants
+    description: Grant discovery and matching
+  - name: Financial
+    description: Financial health monitoring
+  - name: Risk
+    description: Risk assessment and management
+  - name: Users
+    description: User management and authentication
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ==================== ORGANIZATIONS ====================
+  /organizations:
+    get:
+      tags: [Organizations]
+      summary: List all organizations
+      description: Retrieve a paginated list of organizations with optional filtering
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [mission_driven, association, pac]
+        - name: segment
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by name, EIN, or email
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  organizations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Organization'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    post:
+      tags: [Organizations]
+      summary: Create new organization
+      description: Create a new organization with intelligent intake processing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationCreate'
+      responses:
+        '201':
+          description: Organization created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  organization:
+                    $ref: '#/components/schemas/Organization'
+                  classification:
+                    $ref: '#/components/schemas/ClassificationResult'
+                  duplicateCheck:
+                    $ref: '#/components/schemas/DuplicateCheck'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /organizations/{orgId}:
+    get:
+      tags: [Organizations]
+      summary: Get organization by ID
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      tags: [Organizations]
+      summary: Update organization
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationUpdate'
+      responses:
+        '200':
+          description: Organization updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+
+    delete:
+      tags: [Organizations]
+      summary: Delete organization
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+      responses:
+        '204':
+          description: Organization deleted successfully
+
+  # ==================== ASSESSMENTS ====================
+  /assessments:
+    post:
+      tags: [Assessments]
+      summary: Initialize new assessment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - orgId
+              properties:
+                orgId:
+                  type: string
+                  format: uuid
+                trackType:
+                  type: string
+                  enum: [mission_driven, association, pac]
+      responses:
+        '201':
+          description: Assessment initialized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assessment'
+
+  /assessments/{assessmentId}/questions/next:
+    get:
+      tags: [Assessments]
+      summary: Get next optimal question
+      description: Uses AI routing to determine the next most relevant question
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Next question retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  question:
+                    $ref: '#/components/schemas/AssessmentQuestion'
+                  routingDecision:
+                    $ref: '#/components/schemas/RoutingDecision'
+                  progress:
+                    type: object
+                    properties:
+                      completionPercentage:
+                        type: number
+                      questionsAnswered:
+                        type: integer
+                      estimatedRemaining:
+                        type: integer
+
+  /assessments/{assessmentId}/responses:
+    post:
+      tags: [Assessments]
+      summary: Submit answer to question
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - questionId
+                - value
+              properties:
+                questionId:
+                  type: string
+                value:
+                  oneOf:
+                    - type: number
+                    - type: string
+                    - type: boolean
+                    - type: array
+      responses:
+        '201':
+          description: Response recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  response:
+                    $ref: '#/components/schemas/AssessmentResponse'
+                  sectionComplete:
+                    type: boolean
+                  recommendations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Recommendation'
+
+  /assessments/{assessmentId}/score:
+    get:
+      tags: [Assessments]
+      summary: Get assessment score
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Assessment score calculated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  overallScore:
+                    type: number
+                  dimensionScores:
+                    type: object
+                  maturityLevel:
+                    type: integer
+                    minimum: 1
+                    maximum: 5
+                  strengths:
+                    type: array
+                    items:
+                      type: string
+                  weaknesses:
+                    type: array
+                    items:
+                      type: string
+                  recommendations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Recommendation'
+
+  # ==================== COMPLIANCE ====================
+  /compliance/requirements:
+    get:
+      tags: [Compliance]
+      summary: Get compliance requirements
+      parameters:
+        - name: orgId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [compliant, upcoming, overdue, pending]
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [federal, state, local]
+      responses:
+        '200':
+          description: Compliance requirements retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requirements:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ComplianceRequirement'
+                  summary:
+                    type: object
+                    properties:
+                      compliantCount:
+                        type: integer
+                      upcomingCount:
+                        type: integer
+                      overdueCount:
+                        type: integer
+                      totalPenalties:
+                        type: number
+
+  /compliance/calendar:
+    get:
+      tags: [Compliance]
+      summary: Get compliance calendar
+      parameters:
+        - name: orgId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Calendar data retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  days:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        requirements:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/ComplianceRequirement'
+
+  # ==================== DONORS ====================
+  /donors:
+    get:
+      tags: [Donors]
+      summary: List donors
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: segment
+          in: query
+          schema:
+            type: string
+            enum: [major, mid_level, annual, lapsed, prospect]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Donors retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  donors:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Donor'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags: [Donors]
+      summary: Create new donor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DonorCreate'
+      responses:
+        '201':
+          description: Donor created
+
+  /donors/{donorId}/intelligence:
+    get:
+      tags: [Donors]
+      summary: Get donor intelligence
+      description: Get 360-degree donor view with predictive insights
+      parameters:
+        - name: donorId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Donor intelligence retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DonorIntelligence'
+
+  /donors/{donorId}/capacity:
+    get:
+      tags: [Donors]
+      summary: Get giving capacity analysis
+      parameters:
+        - name: donorId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Capacity analysis retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GivingCapacity'
+
+  # ==================== GRANTS ====================
+  /grants/discover:
+    post:
+      tags: [Grants]
+      summary: Discover grant opportunities
+      description: AI-powered grant matching based on organization profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - orgId
+              properties:
+                orgId:
+                  type: string
+                  format: uuid
+                programAreas:
+                  type: array
+                  items:
+                    type: string
+                budgetRange:
+                  type: object
+                  properties:
+                    min:
+                      type: number
+                    max:
+                      type: number
+                geographicFocus:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Grant opportunities discovered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalResults:
+                    type: integer
+                  recommendations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GrantOpportunity'
+
+  # ==================== FINANCIAL ====================
+  /financial/health:
+    get:
+      tags: [Financial]
+      summary: Get financial health metrics
+      parameters:
+        - name: orgId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Financial health metrics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialHealthMetrics'
+
+  /financial/forecast:
+    post:
+      tags: [Financial]
+      summary: Generate cash flow forecast
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - orgId
+              properties:
+                orgId:
+                  type: string
+                  format: uuid
+                months:
+                  type: integer
+                  minimum: 3
+                  maximum: 36
+                  default: 12
+      responses:
+        '200':
+          description: Forecast generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashFlowForecast'
+
+  # ==================== USERS ====================
+  /auth/login:
+    post:
+      tags: [Users]
+      summary: User login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+                  expiresIn:
+                    type: integer
+
+  /auth/refresh:
+    post:
+      tags: [Users]
+      summary: Refresh authentication token
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  expiresIn:
+                    type: integer
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    OrgId:
+      name: orgId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Organization ID
+
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number
+
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Items per page
+
+  schemas:
+    Organization:
+      type: object
+      properties:
+        orgId:
+          type: string
+          format: uuid
+        organizationName:
+          type: string
+        organizationType:
+          type: string
+          enum: [mission_driven, association, pac]
+        taxStatus:
+          type: string
+        ein:
+          type: string
+          pattern: '^\d{2}-\d{7}$'
+        annualBudget:
+          type: number
+        staffSize:
+          type: integer
+        website:
+          type: string
+          format: uri
+        programAreas:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    OrganizationCreate:
+      type: object
+      required:
+        - organizationName
+        - email
+      properties:
+        organizationName:
+          type: string
+        email:
+          type: string
+          format: email
+        ein:
+          type: string
+        taxStatus:
+          type: string
+        annualBudget:
+          type: number
+        website:
+          type: string
+
+    OrganizationUpdate:
+      type: object
+      properties:
+        organizationName:
+          type: string
+        annualBudget:
+          type: number
+        staffSize:
+          type: integer
+
+    ClassificationResult:
+      type: object
+      properties:
+        organizationType:
+          type: string
+        confidence:
+          type: number
+        alternativeTypes:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              confidence:
+                type: number
+
+    DuplicateCheck:
+      type: object
+      properties:
+        hasDuplicates:
+          type: boolean
+        matches:
+          type: array
+          items:
+            type: object
+            properties:
+              orgId:
+                type: string
+              matchScore:
+                type: number
+              reason:
+                type: string
+
+    Assessment:
+      type: object
+      properties:
+        assessmentId:
+          type: string
+          format: uuid
+        orgId:
+          type: string
+          format: uuid
+        trackType:
+          type: string
+        overallScore:
+          type: number
+        completionPercentage:
+          type: number
+        status:
+          type: string
+          enum: [in_progress, completed, archived]
+
+    AssessmentQuestion:
+      type: object
+      properties:
+        questionId:
+          type: string
+        section:
+          type: string
+        text:
+          type: string
+        type:
+          type: string
+          enum: [scale, multiple_choice, yes_no, text, number]
+        options:
+          type: array
+          items:
+            type: string
+        required:
+          type: boolean
+
+    AssessmentResponse:
+      type: object
+      properties:
+        responseId:
+          type: string
+          format: uuid
+        questionId:
+          type: string
+        value:
+          oneOf:
+            - type: number
+            - type: string
+            - type: boolean
+        submittedAt:
+          type: string
+          format: date-time
+
+    RoutingDecision:
+      type: object
+      properties:
+        shouldAsk:
+          type: boolean
+        reason:
+          type: string
+        relevanceScore:
+          type: number
+
+    Recommendation:
+      type: object
+      properties:
+        recommendationId:
+          type: string
+        type:
+          type: string
+          enum: [strength, weakness, opportunity, quick_win]
+        title:
+          type: string
+        description:
+          type: string
+        priority:
+          type: string
+          enum: [critical, high, medium, low]
+
+    ComplianceRequirement:
+      type: object
+      properties:
+        requirementId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        type:
+          type: string
+          enum: [federal, state, local]
+        category:
+          type: string
+        dueDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [compliant, upcoming, overdue, pending]
+        penalties:
+          type: object
+
+    Donor:
+      type: object
+      properties:
+        donorId:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        donorSegment:
+          type: string
+          enum: [major, mid_level, annual, lapsed, prospect]
+
+    DonorCreate:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - email
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+
+    DonorIntelligence:
+      type: object
+      properties:
+        donor:
+          $ref: '#/components/schemas/Donor'
+        donationHistory:
+          type: object
+        engagement:
+          type: object
+        givingCapacity:
+          $ref: '#/components/schemas/GivingCapacity'
+        predictiveInsights:
+          type: object
+
+    GivingCapacity:
+      type: object
+      properties:
+        estimatedCapacity:
+          type: number
+        capacityRating:
+          type: string
+        currentGiving:
+          type: number
+        potentialGiving:
+          type: number
+        askAmount:
+          type: object
+          properties:
+            minimum:
+              type: number
+            target:
+              type: number
+            stretch:
+              type: number
+
+    GrantOpportunity:
+      type: object
+      properties:
+        grantId:
+          type: string
+        title:
+          type: string
+        funder:
+          type: string
+        amount:
+          type: number
+        deadline:
+          type: string
+          format: date
+        matchScore:
+          type: number
+        successProbability:
+          type: number
+
+    FinancialHealthMetrics:
+      type: object
+      properties:
+        overallScore:
+          type: number
+        healthLevel:
+          type: string
+        monthsOfReserves:
+          type: number
+        burnRate:
+          type: number
+        sustainabilityIndex:
+          type: number
+
+    CashFlowForecast:
+      type: object
+      properties:
+        forecastPeriods:
+          type: array
+          items:
+            type: object
+        scenarios:
+          type: object
+        assumptions:
+          type: object
+
+    User:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+  responses:
+    UnauthorizedError:
+      description: Authentication required or token invalid
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Unauthorized
+              message:
+                type: string
+                example: Invalid or expired token
+
+    BadRequestError:
+      description: Invalid request data
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Bad Request
+              message:
+                type: string
+              validation:
+                type: array
+                items:
+                  type: object
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Not Found
+              message:
+                type: string
