@@ -1,0 +1,170 @@
+# ============================================================================
+# AZURE DEPLOYMENT CONFIGURATION
+# Microsoft Copilot Onboarding & ROI Platform
+# ============================================================================
+
+# This file defines the Azure resources needed for deployment
+
+resources:
+  # Resource Group
+  resourceGroup:
+    name: copilot-roi-platform-rg
+    location: eastus
+
+  # Azure Container Registry
+  containerRegistry:
+    name: copilotroiacr
+    sku: Standard
+    adminEnabled: true
+
+  # Azure Kubernetes Service (AKS)
+  kubernetesCluster:
+    name: copilot-roi-aks
+    nodeCount: 3
+    vmSize: Standard_D4s_v3
+    kubernetesVersion: "1.28"
+    networkProfile:
+      networkPlugin: azure
+      serviceCidr: 10.0.0.0/16
+      dnsServiceIP: 10.0.0.10
+
+  # Azure Database for PostgreSQL
+  postgreSQLServer:
+    name: copilot-roi-postgres
+    version: "16"
+    sku:
+      name: B_Gen5_2
+      tier: Basic
+      capacity: 2
+    storage: 100GB
+    backupRetentionDays: 7
+    geoRedundantBackup: Enabled
+    databases:
+      - name: copilot_roi_platform
+        charset: UTF8
+        collation: en_US.utf8
+
+  # Azure Cache for Redis
+  redisCache:
+    name: copilot-roi-redis
+    sku:
+      name: Standard
+      family: C
+      capacity: 1
+    enableNonSslPort: false
+    minimumTlsVersion: "1.2"
+
+  # Azure Storage Account
+  storageAccount:
+    name: copilotroistorage
+    kind: StorageV2
+    sku: Standard_LRS
+    containers:
+      - name: uploads
+        publicAccess: None
+      - name: exports
+        publicAccess: None
+      - name: backups
+        publicAccess: None
+
+  # Azure Key Vault
+  keyVault:
+    name: copilot-roi-keyvault
+    sku: standard
+    enabledForDeployment: true
+    enabledForTemplateDeployment: true
+    secrets:
+      - name: DatabaseConnectionString
+        value: "PLACEHOLDER"
+      - name: RedisConnectionString
+        value: "PLACEHOLDER"
+      - name: JwtSecret
+        value: "PLACEHOLDER"
+      - name: AzureClientSecret
+        value: "PLACEHOLDER"
+
+  # Application Insights
+  applicationInsights:
+    name: copilot-roi-insights
+    applicationType: web
+    workspaceResourceId: "PLACEHOLDER"
+
+  # App Service Plan (Alternative to AKS)
+  appServicePlan:
+    name: copilot-roi-asp
+    sku:
+      tier: PremiumV3
+      name: P1v3
+      capacity: 2
+    kind: Linux
+    reserved: true
+
+  # Web App for Backend (Alternative to AKS)
+  webAppBackend:
+    name: copilot-roi-backend
+    appServicePlan: copilot-roi-asp
+    runtime: node|18-lts
+    alwaysOn: true
+    appSettings:
+      - name: WEBSITE_NODE_DEFAULT_VERSION
+        value: "18-lts"
+      - name: NODE_ENV
+        value: production
+
+  # Static Web App for Frontend
+  staticWebApp:
+    name: copilot-roi-frontend
+    sku: Standard
+    location: eastus2
+    buildProperties:
+      appLocation: /frontend
+      apiLocation: ""
+      outputLocation: dist
+
+  # Azure Functions (for background jobs)
+  functionApp:
+    name: copilot-roi-functions
+    appServicePlan: copilot-roi-asp
+    runtime: node
+    runtimeVersion: "18"
+    storageAccountName: copilotroistorage
+
+  # Azure Monitor - Log Analytics Workspace
+  logAnalyticsWorkspace:
+    name: copilot-roi-logs
+    sku: PerGB2018
+    retentionInDays: 30
+
+  # Virtual Network
+  virtualNetwork:
+    name: copilot-roi-vnet
+    addressPrefix: 10.0.0.0/16
+    subnets:
+      - name: aks-subnet
+        addressPrefix: 10.0.1.0/24
+      - name: database-subnet
+        addressPrefix: 10.0.2.0/24
+      - name: app-subnet
+        addressPrefix: 10.0.3.0/24
+
+  # Network Security Group
+  networkSecurityGroup:
+    name: copilot-roi-nsg
+    securityRules:
+      - name: AllowHTTPS
+        priority: 100
+        direction: Inbound
+        access: Allow
+        protocol: Tcp
+        sourcePortRange: "*"
+        destinationPortRange: "443"
+        sourceAddressPrefix: "*"
+        destinationAddressPrefix: "*"
+
+# Deployment Steps:
+# 1. az login
+# 2. az group create --name copilot-roi-platform-rg --location eastus
+# 3. az deployment group create --resource-group copilot-roi-platform-rg --template-file azure-template.json
+# 4. Configure secrets in Key Vault
+# 5. Deploy container images to ACR
+# 6. Apply Kubernetes manifests to AKS
