@@ -1,0 +1,174 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: nonprofit-db
+    environment:
+      POSTGRES_DB: nonprofit_platform
+      POSTGRES_USER: nonprofit_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-nonprofit_dev_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - nonprofit-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nonprofit_user -d nonprofit_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: nonprofit-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-nonprofit_redis_password}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - nonprofit-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO (S3-compatible storage)
+  minio:
+    image: minio/minio:latest
+    container_name: nonprofit-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin123}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - nonprofit-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nonprofit-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://nonprofit_user:${DB_PASSWORD:-nonprofit_dev_password}@postgres:5432/nonprofit_platform
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nonprofit_redis_password}@redis:6379
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${MINIO_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_PASSWORD:-minioadmin123}
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production}
+      PORT: 3001
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    ports:
+      - "3001:3001"
+    networks:
+      - nonprofit-network
+    command: npm run dev
+
+  # Frontend Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nonprofit-frontend
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NODE_ENV: development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    networks:
+      - nonprofit-network
+    command: npm run dev
+
+  # AI/ML Engine
+  ai-engine:
+    build:
+      context: ./ai-engines
+      dockerfile: Dockerfile
+    container_name: nonprofit-ai
+    depends_on:
+      - backend
+    environment:
+      PYTHON_ENV: development
+      API_URL: http://backend:3001
+    volumes:
+      - ./ai-engines:/app
+      - ai_models:/app/models
+    ports:
+      - "5000:5000"
+    networks:
+      - nonprofit-network
+    command: python src/server.py
+
+  # Elasticsearch (for search functionality)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    container_name: nonprofit-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - nonprofit-network
+
+  # RabbitMQ (for job queues)
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: nonprofit-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-nonprofit}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-nonprofit_password}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - nonprofit-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  elasticsearch_data:
+  rabbitmq_data:
+  ai_models:
+
+networks:
+  nonprofit-network:
+    driver: bridge
