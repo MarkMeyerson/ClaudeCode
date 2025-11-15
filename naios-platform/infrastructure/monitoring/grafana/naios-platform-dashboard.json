@@ -1,0 +1,307 @@
+{
+  "dashboard": {
+    "title": "NAIOS Platform - Overview",
+    "tags": ["naios", "platform", "overview"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "type": "graph",
+        "title": "HTTP Request Rate",
+        "targets": [
+          {
+            "expr": "sum(rate(naios_http_requests_total[5m])) by (service)",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Requests/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 2,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "type": "graph",
+        "title": "HTTP Request Latency (p95)",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(naios_http_request_duration_seconds_bucket[5m])) by (service, le))",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Latency"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 3,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "type": "graph",
+        "title": "HTTP Error Rate",
+        "targets": [
+          {
+            "expr": "sum(rate(naios_http_requests_total{status_code=~\"5..\"}[5m])) by (service) / sum(rate(naios_http_requests_total[5m])) by (service)",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "percentunit", "label": "Error Rate"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 4,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "type": "graph",
+        "title": "Database Query Latency (p95)",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(naios_db_query_duration_seconds_bucket[5m])) by (service, operation, le))",
+            "legendFormat": "{{service}} - {{operation}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Latency"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 5,
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 16},
+        "type": "stat",
+        "title": "Total Donations (24h)",
+        "targets": [
+          {
+            "expr": "sum(increase(naios_donations_received_total[24h]))",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 16},
+        "type": "stat",
+        "title": "Active Volunteers",
+        "targets": [
+          {
+            "expr": "naios_active_volunteers",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 16},
+        "type": "stat",
+        "title": "Active Programs",
+        "targets": [
+          {
+            "expr": "sum(naios_programs_active)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 8,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "type": "graph",
+        "title": "Cache Hit Rate",
+        "targets": [
+          {
+            "expr": "sum(rate(naios_cache_hits_total[5m])) by (service) / (sum(rate(naios_cache_hits_total[5m])) by (service) + sum(rate(naios_cache_misses_total[5m])) by (service))",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "percentunit", "label": "Hit Rate"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 9,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "type": "graph",
+        "title": "Database Connection Pool",
+        "targets": [
+          {
+            "expr": "naios_db_pool_size",
+            "legendFormat": "{{service}} - Total",
+            "refId": "A"
+          },
+          {
+            "expr": "naios_db_pool_idle",
+            "legendFormat": "{{service}} - Idle",
+            "refId": "B"
+          },
+          {
+            "expr": "naios_db_pool_waiting",
+            "legendFormat": "{{service}} - Waiting",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Connections"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 10,
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32},
+        "type": "graph",
+        "title": "Donation Amount Distribution",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(naios_donation_amount_dollars_bucket[1h])) by (le))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.90, sum(rate(naios_donation_amount_dollars_bucket[1h])) by (le))",
+            "legendFormat": "p90",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(naios_donation_amount_dollars_bucket[1h])) by (le))",
+            "legendFormat": "p95",
+            "refId": "C"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(naios_donation_amount_dollars_bucket[1h])) by (le))",
+            "legendFormat": "p99",
+            "refId": "D"
+          }
+        ],
+        "yaxes": [
+          {"format": "currencyUSD", "label": "Amount"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 11,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
+        "type": "graph",
+        "title": "Assessment Scores",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(naios_assessment_score_bucket[1h])) by (dimension, le))",
+            "legendFormat": "{{dimension}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Score", "min": 0, "max": 5},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 12,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
+        "type": "graph",
+        "title": "SROI Ratio Distribution",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(naios_sroi_ratio_bucket[1h])) by (le))",
+            "legendFormat": "Median SROI",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "SROI Ratio"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 13,
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 48},
+        "type": "graph",
+        "title": "Services Delivered by Type",
+        "targets": [
+          {
+            "expr": "sum(increase(naios_services_delivered_total[1h])) by (service_type)",
+            "legendFormat": "{{service_type}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Services"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 14,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 56},
+        "type": "graph",
+        "title": "Authentication Attempts",
+        "targets": [
+          {
+            "expr": "sum(rate(naios_auth_attempts_total[5m])) by (status)",
+            "legendFormat": "{{status}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "ops", "label": "Attempts/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 15,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 56},
+        "type": "graph",
+        "title": "WebSocket Connections",
+        "targets": [
+          {
+            "expr": "naios_websocket_connections",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Connections"},
+          {"format": "short"}
+        ]
+      }
+    ]
+  }
+}

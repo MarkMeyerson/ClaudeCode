@@ -1,0 +1,475 @@
+name: Release Management
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.2.3)'
+        required: true
+        type: string
+      release_type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate version format
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          if ! [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version format: $VERSION"
+            echo "Expected format: v1.2.3"
+            exit 1
+          fi
+
+      - name: Check if version exists
+        run: |
+          if git rev-parse "${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "Version ${{ steps.version.outputs.version }} already exists"
+            exit 1
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            # First release
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --reverse)
+          else
+            # Generate changelog since last tag
+            CHANGELOG=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)")
+          fi
+
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  build-artifacts:
+    name: Build Release Artifacts
+    runs-on: ubuntu-latest
+    needs: [validate]
+
+    strategy:
+      matrix:
+        service:
+          - assessment-engine
+          - donor-management
+          - volunteer-coordinator
+          - grant-intelligence
+          - impact-analytics
+          - financial-hub
+          - content-orchestrator
+          - board-governance
+          - security-compliance
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8.x'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build service
+        run: pnpm run build --filter=@naios/${{ matrix.service }}
+
+      - name: Create tarball
+        run: |
+          cd services/${{ matrix.service }}
+          tar -czf ../../${{ matrix.service }}-${{ needs.validate.outputs.version }}.tar.gz dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.service }}-${{ needs.validate.outputs.version }}
+          path: ${{ matrix.service }}-${{ needs.validate.outputs.version }}.tar.gz
+          retention-days: 90
+
+  build-docker-images:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [validate]
+
+    strategy:
+      matrix:
+        service:
+          - assessment-engine
+          - donor-management
+          - volunteer-coordinator
+          - grant-intelligence
+          - impact-analytics
+          - financial-hub
+          - content-orchestrator
+          - board-governance
+          - security-compliance
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            naios-platform/${{ matrix.service }}
+            ghcr.io/${{ github.repository }}/${{ matrix.service }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.validate.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.validate.outputs.version }}
+            type=semver,pattern={{major}},value=${{ needs.validate.outputs.version }}
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./services/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=naios-platform/${{ matrix.service }}:buildcache
+          cache-to: type=registry,ref=naios-platform/${{ matrix.service }}:buildcache,mode=max
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ needs.validate.outputs.version }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+
+      - name: Sign Docker image
+        run: |
+          echo "Signing Docker image with Cosign"
+          # TODO: Implement image signing with Cosign
+
+  generate-sbom:
+    name: Generate Software Bill of Materials
+    runs-on: ubuntu-latest
+    needs: [validate, build-docker-images]
+
+    strategy:
+      matrix:
+        service:
+          - assessment-engine
+          - donor-management
+          - volunteer-coordinator
+          - grant-intelligence
+          - impact-analytics
+          - financial-hub
+          - content-orchestrator
+          - board-governance
+          - security-compliance
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate SBOM with Syft
+        uses: anchore/sbom-action@v0
+        with:
+          image: naios-platform/${{ matrix.service }}:${{ needs.validate.outputs.version }}
+          artifact-name: sbom-${{ matrix.service }}.spdx.json
+          output-file: sbom-${{ matrix.service }}.spdx.json
+          format: spdx-json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom-${{ matrix.service }}
+          path: sbom-${{ matrix.service }}.spdx.json
+          retention-days: 365
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate, build-artifacts, build-docker-images, generate-sbom]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: release-artifacts/
+
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          cat > RELEASE_NOTES.md << EOF
+          # NAIOS Platform ${{ needs.validate.outputs.version }}
+
+          ## What's Changed
+
+          ${{ needs.validate.outputs.changelog }}
+
+          ## Breaking Changes
+
+          <!-- Add breaking changes here -->
+
+          ## New Features
+
+          <!-- Extract feature commits -->
+          $(git log --pretty=format:"- %s (%h)" --grep="^feat" HEAD^..HEAD)
+
+          ## Bug Fixes
+
+          $(git log --pretty=format:"- %s (%h)" --grep="^fix" HEAD^..HEAD)
+
+          ## Performance Improvements
+
+          $(git log --pretty=format:"- %s (%h)" --grep="^perf" HEAD^..HEAD)
+
+          ## Documentation
+
+          $(git log --pretty=format:"- %s (%h)" --grep="^docs" HEAD^..HEAD)
+
+          ## Docker Images
+
+          All services are available as Docker images:
+
+          - assessment-engine: \`naios-platform/assessment-engine:${{ needs.validate.outputs.version }}\`
+          - donor-management: \`naios-platform/donor-management:${{ needs.validate.outputs.version }}\`
+          - volunteer-coordinator: \`naios-platform/volunteer-coordinator:${{ needs.validate.outputs.version }}\`
+          - grant-intelligence: \`naios-platform/grant-intelligence:${{ needs.validate.outputs.version }}\`
+          - impact-analytics: \`naios-platform/impact-analytics:${{ needs.validate.outputs.version }}\`
+          - financial-hub: \`naios-platform/financial-hub:${{ needs.validate.outputs.version }}\`
+          - content-orchestrator: \`naios-platform/content-orchestrator:${{ needs.validate.outputs.version }}\`
+          - board-governance: \`naios-platform/board-governance:${{ needs.validate.outputs.version }}\`
+          - security-compliance: \`naios-platform/security-compliance:${{ needs.validate.outputs.version }}\`
+
+          ## Deployment
+
+          To deploy this version:
+
+          \`\`\`bash
+          kubectl set image deployment/* *=naios-platform/*:${{ needs.validate.outputs.version }} -n naios-platform
+          \`\`\`
+
+          ## Checksums
+
+          See the attached artifacts for checksums.
+
+          ---
+
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/...HEAD
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.validate.outputs.version }}
+          name: NAIOS Platform ${{ needs.validate.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          files: |
+            release-artifacts/**/*.tar.gz
+            release-artifacts/**/*.spdx.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-documentation:
+    name: Update Documentation
+    runs-on: ubuntu-latest
+    needs: [validate, create-release]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Update version in README
+        run: |
+          sed -i "s/Version: .*/Version: ${{ needs.validate.outputs.version }}/" README.md
+
+      - name: Update CHANGELOG
+        run: |
+          cat > CHANGELOG_NEW.md << EOF
+          # Changelog
+
+          ## [${{ needs.validate.outputs.version }}] - $(date +%Y-%m-%d)
+
+          ${{ needs.validate.outputs.changelog }}
+
+          EOF
+
+          if [ -f CHANGELOG.md ]; then
+            tail -n +2 CHANGELOG.md >> CHANGELOG_NEW.md
+          fi
+
+          mv CHANGELOG_NEW.md CHANGELOG.md
+
+      - name: Commit documentation updates
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add README.md CHANGELOG.md
+          git commit -m "docs: update documentation for ${{ needs.validate.outputs.version }}"
+          git push
+
+  notify-stakeholders:
+    name: Notify Stakeholders
+    runs-on: ubuntu-latest
+    needs: [validate, create-release]
+
+    steps:
+      - name: Send Slack notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: |
+            🚀 NAIOS Platform ${{ needs.validate.outputs.version }} Released!
+
+            Release Notes: https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate.outputs.version }}
+
+            Docker Images: All services updated to ${{ needs.validate.outputs.version }}
+
+            Ready for deployment! 🎉
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Send email notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: 'NAIOS Platform ${{ needs.validate.outputs.version }} Released'
+          to: ${{ secrets.RELEASE_EMAIL_LIST }}
+          from: NAIOS Release Team
+          body: |
+            Dear NAIOS Team,
+
+            We are excited to announce the release of NAIOS Platform ${{ needs.validate.outputs.version }}.
+
+            Release Notes: https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate.outputs.version }}
+
+            All services have been updated and Docker images are available in the registry.
+
+            Please review the release notes for any breaking changes or important updates.
+
+            Best regards,
+            NAIOS Release Team
+
+  rollback-plan:
+    name: Generate Rollback Plan
+    runs-on: ubuntu-latest
+    needs: [validate, create-release]
+
+    steps:
+      - name: Create rollback instructions
+        run: |
+          cat > ROLLBACK_${{ needs.validate.outputs.version }}.md << EOF
+          # Rollback Plan for ${{ needs.validate.outputs.version }}
+
+          In case of issues with this release, follow these steps to rollback:
+
+          ## Quick Rollback
+
+          \`\`\`bash
+          # Get previous version
+          PREV_VERSION=\$(kubectl get deployment assessment-engine -n naios-platform -o jsonpath='{.metadata.annotations.previous-version}')
+
+          # Rollback all deployments
+          kubectl set image deployment/* *=naios-platform/*:\$PREV_VERSION -n naios-platform
+
+          # Verify rollback
+          kubectl rollout status deployment --all -n naios-platform
+          \`\`\`
+
+          ## Database Rollback
+
+          If database migrations were applied:
+
+          \`\`\`bash
+          pnpm run migrate:down
+          \`\`\`
+
+          ## Verification
+
+          After rollback, verify:
+
+          1. All pods are running
+          2. Health checks pass
+          3. Critical API endpoints respond
+          4. No error spikes in logs
+
+          ## Contacts
+
+          - On-call Engineer: [Slack Channel]
+          - Database Admin: [Contact]
+          - DevOps Lead: [Contact]
+          EOF
+
+      - name: Upload rollback plan
+        uses: actions/upload-artifact@v3
+        with:
+          name: rollback-plan
+          path: ROLLBACK_${{ needs.validate.outputs.version }}.md
+          retention-days: 365

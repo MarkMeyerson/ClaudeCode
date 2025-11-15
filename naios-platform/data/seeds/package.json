@@ -1,0 +1,37 @@
+{
+  "name": "@naios/seed-data",
+  "version": "1.0.0",
+  "description": "Comprehensive seed data generators for NAIOS platform",
+  "main": "dist/index.js",
+  "bin": {
+    "naios-seed": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "seed": "ts-node src/cli.ts",
+    "seed:small": "ts-node src/cli.ts --size=small",
+    "seed:medium": "ts-node src/cli.ts --size=medium",
+    "seed:large": "ts-node src/cli.ts --size=large",
+    "seed:assessment": "ts-node src/cli.ts --schema=assessment",
+    "seed:donor": "ts-node src/cli.ts --schema=donor",
+    "seed:financial": "ts-node src/cli.ts --schema=financial",
+    "seed:volunteer": "ts-node src/cli.ts --schema=volunteer",
+    "seed:grant": "ts-node src/cli.ts --schema=grant",
+    "seed:impact": "ts-node src/cli.ts --schema=impact",
+    "seed:all": "ts-node src/cli.ts --all",
+    "clean": "ts-node src/cli.ts --clean"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^8.3.1",
+    "dotenv": "^16.3.1",
+    "pg": "^8.11.3",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/pg": "^8.10.9",
+    "@types/yargs": "^17.0.32",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.2"
+  }
+}
