@@ -1,26 +1,42 @@
 {
-  "buildCommand": "cd frontend && npm ci && npm run build",
+  "buildCommand": "npm ci --legacy-peer-deps && cd frontend && npm ci --legacy-peer-deps && npm run build",
   "outputDirectory": "frontend/dist",
-  "framework": null,
-  "env": {
-    "DATABASE_URL": "@database_url"
+  "framework": "vite",
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs20.x"
+    }
   },
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
-      "source": "/api/assessment/questions",
-      "destination": "/api/get-questions"
-    },
-    {
-      "source": "/api/assessment/start",
-      "destination": "/api/save-lead"
-    },
-    {
-      "source": "/api/assessment/:id/submit",
-      "destination": "/api/submit-assessment"
-    },
-    {
-      "source": "/api/assessment/:id/results",
-      "destination": "/api/get-results"
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
     }
   ]
 }
