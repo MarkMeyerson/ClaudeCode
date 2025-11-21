@@ -1,5 +1,6 @@
 {
-  "buildCommand": "cd frontend && chmod +x vercel-build.sh && ./vercel-build.sh",
+  "installCommand": "cd frontend && npm install",
+  "buildCommand": "cd frontend && npx vite build",
   "outputDirectory": "frontend/dist",
   "framework": null,
   "rewrites": [
@@ -19,11 +20,5 @@
       "source": "/api/assessment/:id/results",
       "destination": "/api/get-results"
     }
-  ],
-  "functions": {
-    "api/*.ts": {
-      "maxDuration": 10
-    }
-  },
-  "installCommand": "cd frontend && npm install"
+  ]
 }
