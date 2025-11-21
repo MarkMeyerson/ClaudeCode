@@ -98,10 +98,21 @@ export const assessmentApi = {
     return response.data.data;
   },
 
-  // Start new assessment
+  // Start new assessment (using simple endpoint)
   startAssessment: async (data: AssessmentData): Promise<{ assessmentId: string; createdAt: string }> => {
-    const response = await api.post('/assessment/start', data);
-    return response.data.data;
+    // Map frontend data format to API format
+    const apiData = {
+      company_name: data.companyName,
+      email: data.email,
+      company_size: data.companySize,
+      industry: data.industry
+    };
+    const response = await api.post('/assessment', apiData);
+    // Map response back to expected format
+    return {
+      assessmentId: response.data.assessment.id,
+      createdAt: response.data.assessment.created_at
+    };
   },
 
   // Submit assessment responses
