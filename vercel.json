@@ -2,10 +2,6 @@
   "version": 2,
   "builds": [
     {
-      "src": "backend/src/server.ts",
-      "use": "@vercel/node"
-    },
-    {
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
@@ -13,14 +9,32 @@
       }
     }
   ],
+  "rewrites": [
+    {
+      "source": "/api/assessment/questions",
+      "destination": "/api/get-questions"
+    },
+    {
+      "source": "/api/assessment/start",
+      "destination": "/api/save-lead"
+    },
+    {
+      "source": "/api/assessment/:id/submit",
+      "destination": "/api/submit-assessment?id=:id"
+    },
+    {
+      "source": "/api/assessment/:id/results",
+      "destination": "/api/get-results?id=:id"
+    }
+  ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "backend/src/server.ts"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "frontend/$1"
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      }
     }
   ]
 }

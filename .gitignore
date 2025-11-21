@@ -35,3 +35,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 .cache/
+
+# Vercel
+.vercel
+.vercel_build_output
