@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export interface AssessmentResponse {
   questionId: string;
@@ -81,6 +81,17 @@ api.interceptors.response.use(
 );
 
 export const assessmentApi = {
+  // Simple assessment submission (new endpoint)
+  submitSimpleAssessment: async (data: {
+    company_name: string;
+    email: string;
+    company_size?: string;
+    industry?: string;
+  }): Promise<any> => {
+    const response = await api.post('/assessment', data);
+    return response.data;
+  },
+
   // Get assessment questions
   getQuestions: async (): Promise<{ dimensions: Dimension[]; totalQuestions: number }> => {
     const response = await api.get('/assessment/questions');
