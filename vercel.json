@@ -1,8 +1,11 @@
 {
-  "installCommand": "cd frontend && npm install",
-  "buildCommand": "cd frontend && npx vite build",
+  "buildCommand": "cd frontend && npm ci && npm run build",
   "outputDirectory": "frontend/dist",
   "framework": null,
+  "nodeVersion": "20.x",
+  "env": {
+    "DATABASE_URL": "@database_url"
+  },
   "rewrites": [
     {
       "source": "/api/assessment/questions",
