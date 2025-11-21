@@ -1,11 +1,16 @@
 {
-  "buildCommand": "cd frontend && npm install && npm run build",
+  "buildCommand": "cd frontend && chmod +x vercel-build.sh && ./vercel-build.sh",
   "outputDirectory": "frontend/dist",
-  "installCommand": "npm install && cd frontend && npm install",
+  "framework": null,
   "rewrites": [
     { "source": "/api/assessment/questions", "destination": "/api/get-questions" },
     { "source": "/api/assessment/start", "destination": "/api/save-lead" },
     { "source": "/api/assessment/:id/submit", "destination": "/api/submit-assessment" },
     { "source": "/api/assessment/:id/results", "destination": "/api/get-results" }
-  ]
-}
+  ],
+  "functions": {
+    "api/*.ts": {
+      "maxDuration": 10
+    }
+  }
+}}
