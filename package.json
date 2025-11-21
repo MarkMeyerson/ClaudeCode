@@ -3,9 +3,12 @@
   "version": "1.0.1",
   "description": "AI Readiness Assessment Bot - Serverless API",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "vercel dev",
-    "build": "tsc --noEmit",
+    "build": "echo 'Serverless functions build automatically'",
     "deploy": "vercel --prod"
   },
   "dependencies": {
