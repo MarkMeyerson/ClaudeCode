@@ -5,43 +5,32 @@ import { setCorsHeaders } from './lib/cors';
 function generateMockResults(assessmentId: string) {
   return {
     success: true,
-    results: {
-      strategic_clarity: {
-        score: 72,
-        description: 'Good understanding of AI strategy and goals. Your organization has identified key use cases and has a documented AI vision.'
+    data: {
+      assessment: {
+        id: assessmentId,
+        companyName: 'Your Organization',
+        email: 'contact@example.com',
+        completedAt: new Date().toISOString()
       },
-      governance_readiness: {
-        score: 58,
-        description: 'Governance framework needs development. Consider establishing clear AI policies, ethics guidelines, and compliance procedures.'
-      },
-      team_capability: {
-        score: 65,
-        description: 'Team has foundational AI knowledge. Investment in training and upskilling will help build stronger AI capabilities.'
-      },
-      technical_infrastructure: {
-        score: 70,
-        description: 'Solid technical foundation. Your infrastructure is well-positioned to support AI implementations with some enhancements.'
-      },
-      executive_alignment: {
-        score: 68,
-        description: 'Leadership is aligned on AI initiatives. Strong executive support provides a solid foundation for AI adoption.'
+      score: {
+        dimensionScores: [
+          { dimension: 'strategic_clarity', score: 72, maxScore: 20, percentage: 72 },
+          { dimension: 'governance_readiness', score: 58, maxScore: 20, percentage: 58 },
+          { dimension: 'team_capability', score: 65, maxScore: 20, percentage: 65 },
+          { dimension: 'technical_infrastructure', score: 70, maxScore: 20, percentage: 70 },
+          { dimension: 'executive_alignment', score: 68, maxScore: 20, percentage: 68 }
+        ],
+        totalScore: 67,
+        maxTotalScore: 100,
+        percentage: 67,
+        readinessPhase: 'Activate',
+        phaseDescription: 'Your organization is ready to begin implementing AI projects. Focus on pilot projects and capability building.',
+        recommendations: [
+          'Launch pilot AI projects',
+          'Build or acquire necessary technical capabilities',
+          'Establish measurement and monitoring systems'
+        ]
       }
-    },
-    assessment: {
-      id: assessmentId,
-      company_name: 'Your Organization',
-      email: 'contact@example.com',
-      created_at: new Date().toISOString()
-    },
-    score: {
-      totalScore: 67,
-      readinessPhase: 'Activate',
-      phaseDescription: 'Your organization is ready to begin implementing AI projects. Focus on pilot projects and capability building.',
-      recommendations: [
-        'Launch pilot AI projects',
-        'Build or acquire necessary technical capabilities',
-        'Establish measurement and monitoring systems'
-      ]
     }
   };
 }
@@ -94,68 +83,87 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const technical_infrastructure_score = Math.round((assessment.technical_infrastructure_score || 0) / 20 * 100);
       const executive_alignment_score = Math.round((assessment.executive_alignment_score || 0) / 20 * 100);
 
-      // Return formatted results
+      // Return formatted results with data wrapper for frontend
       return res.status(200).json({
         success: true,
-        results: {
-          strategic_clarity: {
-            score: strategic_clarity_score,
-            description: strategic_clarity_score > 70
-              ? 'Strong AI strategy with clear goals and measurable outcomes.'
-              : strategic_clarity_score > 50
-              ? 'Good understanding of AI strategy. Continue refining your vision and use cases.'
-              : 'AI strategy needs development. Focus on defining clear goals and identifying use cases.'
+        data: {
+          assessment: {
+            id: assessment.id,
+            companyName: assessment.company_name,
+            email: assessment.email,
+            completedAt: assessment.created_at
           },
-          governance_readiness: {
-            score: governance_readiness_score,
-            description: governance_readiness_score > 70
-              ? 'Comprehensive governance framework with clear policies and compliance measures.'
-              : governance_readiness_score > 50
-              ? 'Governance framework in progress. Continue developing policies and compliance procedures.'
-              : 'Governance framework needs development. Establish AI policies, ethics guidelines, and budget allocation.'
-          },
-          team_capability: {
-            score: team_capability_score,
-            description: team_capability_score > 70
-              ? 'Strong team capabilities with AI expertise and change management experience.'
-              : team_capability_score > 50
-              ? 'Team has foundational AI knowledge. Investment in training will strengthen capabilities.'
-              : 'Team capability needs development. Focus on training, hiring, or partnering for AI expertise.'
-          },
-          technical_infrastructure: {
-            score: technical_infrastructure_score,
-            description: technical_infrastructure_score > 70
-              ? 'Modern, scalable infrastructure ready for AI implementations.'
-              : technical_infrastructure_score > 50
-              ? 'Solid technical foundation. Some infrastructure upgrades will optimize AI readiness.'
-              : 'Infrastructure modernization needed. Focus on data consolidation and system upgrades.'
-          },
-          executive_alignment: {
-            score: executive_alignment_score,
-            description: executive_alignment_score > 70
-              ? 'Full executive alignment with strong sponsorship and committed resources.'
-              : executive_alignment_score > 50
-              ? 'Leadership is supportive of AI initiatives. Continue building alignment and securing resources.'
-              : 'Executive alignment needed. Focus on building leadership buy-in and stakeholder consensus.'
+          score: {
+            dimensionScores: [
+              {
+                dimension: 'strategic_clarity',
+                score: strategic_clarity_score,
+                maxScore: 20,
+                percentage: strategic_clarity_score,
+                description: strategic_clarity_score > 70
+                  ? 'Strong AI strategy with clear goals and measurable outcomes.'
+                  : strategic_clarity_score > 50
+                  ? 'Good understanding of AI strategy. Continue refining your vision and use cases.'
+                  : 'AI strategy needs development. Focus on defining clear goals and identifying use cases.'
+              },
+              {
+                dimension: 'governance_readiness',
+                score: governance_readiness_score,
+                maxScore: 20,
+                percentage: governance_readiness_score,
+                description: governance_readiness_score > 70
+                  ? 'Comprehensive governance framework with clear policies and compliance measures.'
+                  : governance_readiness_score > 50
+                  ? 'Governance framework in progress. Continue developing policies and compliance procedures.'
+                  : 'Governance framework needs development. Establish AI policies, ethics guidelines, and budget allocation.'
+              },
+              {
+                dimension: 'team_capability',
+                score: team_capability_score,
+                maxScore: 20,
+                percentage: team_capability_score,
+                description: team_capability_score > 70
+                  ? 'Strong team capabilities with AI expertise and change management experience.'
+                  : team_capability_score > 50
+                  ? 'Team has foundational AI knowledge. Investment in training will strengthen capabilities.'
+                  : 'Team capability needs development. Focus on training, hiring, or partnering for AI expertise.'
+              },
+              {
+                dimension: 'technical_infrastructure',
+                score: technical_infrastructure_score,
+                maxScore: 20,
+                percentage: technical_infrastructure_score,
+                description: technical_infrastructure_score > 70
+                  ? 'Modern, scalable infrastructure ready for AI implementations.'
+                  : technical_infrastructure_score > 50
+                  ? 'Solid technical foundation. Some infrastructure upgrades will optimize AI readiness.'
+                  : 'Infrastructure modernization needed. Focus on data consolidation and system upgrades.'
+              },
+              {
+                dimension: 'executive_alignment',
+                score: executive_alignment_score,
+                maxScore: 20,
+                percentage: executive_alignment_score,
+                description: executive_alignment_score > 70
+                  ? 'Full executive alignment with strong sponsorship and committed resources.'
+                  : executive_alignment_score > 50
+                  ? 'Leadership is supportive of AI initiatives. Continue building alignment and securing resources.'
+                  : 'Executive alignment needed. Focus on building leadership buy-in and stakeholder consensus.'
+              }
+            ],
+            totalScore: assessment.total_score || 67,
+            maxTotalScore: 100,
+            percentage: assessment.total_score || 67,
+            readinessPhase: assessment.readiness_phase || 'Activate',
+            phaseDescription: assessment.readiness_phase ?
+              `Your organization is in the ${assessment.readiness_phase} phase of AI readiness.` :
+              'Your organization is ready to begin implementing AI projects.',
+            recommendations: [
+              'Launch pilot AI projects',
+              'Build technical capabilities',
+              'Establish measurement systems'
+            ]
           }
-        },
-        assessment: {
-          id: assessment.id,
-          company_name: assessment.company_name,
-          email: assessment.email,
-          created_at: assessment.created_at
-        },
-        score: {
-          totalScore: assessment.total_score || 67,
-          readinessPhase: assessment.readiness_phase || 'Activate',
-          phaseDescription: assessment.readiness_phase ?
-            `Your organization is in the ${assessment.readiness_phase} phase of AI readiness.` :
-            'Your organization is ready to begin implementing AI projects.',
-          recommendations: [
-            'Launch pilot AI projects',
-            'Build technical capabilities',
-            'Establish measurement systems'
-          ]
         }
       });
 
@@ -174,3 +182,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json(mockData);
   }
 }
+
