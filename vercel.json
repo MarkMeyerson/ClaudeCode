@@ -24,5 +24,6 @@
     "api/*.ts": {
       "maxDuration": 10
     }
-  }
+  },
+  "installCommand": "cd frontend && npm install"
 }
