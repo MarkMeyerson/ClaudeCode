@@ -4,10 +4,11 @@
   "description": "AI Readiness Assessment Bot - Serverless API",
   "private": true,
   "scripts": {
-    "dev": "vercel dev",
-    "build": "tsc --noEmit",
-    "deploy": "vercel --prod"
-  },
+  "dev": "vercel dev",
+  "build": "tsc --noEmit",
+  "build:all": "cd frontend && npm ci && npm run build",
+  "deploy": "vercel --prod"
+},
   "dependencies": {
     "pg": "^8.11.3"
   },
