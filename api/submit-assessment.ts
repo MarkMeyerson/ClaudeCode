@@ -1,5 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders } from './lib/cors';
+import { setCorsHeaders } from './_lib/cors';
 
 // Mock scoring function in case database fails
 function calculateMockScore(responses: any) {
