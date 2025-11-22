@@ -102,16 +102,18 @@ export const assessmentApi = {
   startAssessment: async (data: AssessmentData): Promise<{ assessmentId: string; createdAt: string }> => {
     // Map frontend data format to API format
     const apiData = {
-      company_name: data.companyName,
+      companyName: data.companyName,
+      contactName: data.contactName,
       email: data.email,
-      company_size: data.companySize,
+      phone: data.phone,
+      companySize: data.companySize,
       industry: data.industry
     };
     const response = await api.post('/assessment', apiData);
     // Map response back to expected format
     return {
-      assessmentId: response.data.assessment.id,
-      createdAt: response.data.assessment.created_at
+      assessmentId: response.data.data.assessmentId,
+      createdAt: response.data.data.createdAt
     };
   },
 
