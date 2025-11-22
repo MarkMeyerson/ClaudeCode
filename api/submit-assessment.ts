@@ -1,5 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { setCorsHeaders } from './lib/cors';
+import { calculateAssessmentScore, DimensionScore } from './lib/scoring';
+import { query } from './lib/db';
 
 // Mock scoring function in case database fails
 function calculateMockScore(responses: any) {
@@ -76,9 +78,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let assessmentScore;
 
     try {
-      // Try to use the real scoring if available
-      const { calculateAssessmentScore } = await import('./lib/scoring');
-
       // Convert answers object to responses array if needed
       let responsesArray = assessmentData;
       if (!Array.isArray(assessmentData)) {
@@ -102,8 +101,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Try to save to database, but don't fail if it doesn't work
     try {
-      const { query } = await import('./lib/db');
-
       // Try to update assessment in database
       await query(
         `UPDATE assessments SET
@@ -118,11 +115,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           completed_at = CURRENT_TIMESTAMP
          WHERE id = $8`,
         [
-          assessmentScore.dimensionScores.find(d => d.dimension === 'strategic_clarity')?.score || 0,
-          assessmentScore.dimensionScores.find(d => d.dimension === 'governance_readiness')?.score || 0,
-          assessmentScore.dimensionScores.find(d => d.dimension === 'team_capability')?.score || 0,
-          assessmentScore.dimensionScores.find(d => d.dimension === 'technical_infrastructure')?.score || 0,
-          assessmentScore.dimensionScores.find(d => d.dimension === 'executive_alignment')?.score || 0,
+          assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'strategic_clarity')?.score || 0,
+          assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'governance_readiness')?.score || 0,
+          assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'team_capability')?.score || 0,
+          assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'technical_infrastructure')?.score || 0,
+          assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'executive_alignment')?.score || 0,
           assessmentScore.totalScore,
           assessmentScore.readinessPhase,
           assessmentId
@@ -138,23 +135,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       success: true,
       results: {
         strategic_clarity: {
-          score: assessmentScore.dimensionScores.find(d => d.dimension === 'strategic_clarity')?.score || 65,
+          score: assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'strategic_clarity')?.score || 65,
           description: 'Good understanding of AI strategy and goals'
         },
         governance_readiness: {
-          score: assessmentScore.dimensionScores.find(d => d.dimension === 'governance_readiness')?.score || 58,
+          score: assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'governance_readiness')?.score || 58,
           description: 'Governance framework needs development'
         },
         team_capability: {
-          score: assessmentScore.dimensionScores.find(d => d.dimension === 'team_capability')?.score || 62,
+          score: assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'team_capability')?.score || 62,
           description: 'Team has foundational AI knowledge'
         },
         technical_infrastructure: {
-          score: assessmentScore.dimensionScores.find(d => d.dimension === 'technical_infrastructure')?.score || 70,
+          score: assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'technical_infrastructure')?.score || 70,
           description: 'Solid technical foundation'
         },
         executive_alignment: {
-          score: assessmentScore.dimensionScores.find(d => d.dimension === 'executive_alignment')?.score || 68,
+          score: assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'executive_alignment')?.score || 68,
           description: 'Leadership is aligned on AI initiatives'
         }
       },

@@ -67,7 +67,7 @@ export async function sendToHubSpot(data: LeadData): Promise<void> {
       );
     }
 
-    const searchResult = await searchResponse.json();
+    const searchResult = await searchResponse.json() as any;
     const existingContact = searchResult.results?.[0];
 
     // Prepare contact properties
@@ -137,7 +137,7 @@ export async function sendToHubSpot(data: LeadData): Promise<void> {
         );
       }
 
-      const newContact = await createResponse.json();
+      const newContact = await createResponse.json() as any;
       console.log(`Created new HubSpot contact: ${newContact.id}`);
     }
   } catch (error: any) {
