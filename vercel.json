@@ -18,6 +18,10 @@
     {
       "source": "/api/assessment/:id/results",
       "destination": "/api/get-results?id=:id"
+    },
+    {
+      "source": "/api/send-report",
+      "destination": "/api/send-report"
     }
   ]
 }
