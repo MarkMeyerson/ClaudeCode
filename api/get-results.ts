@@ -1,5 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { setCorsHeaders } from './lib/cors';
+import { query } from './lib/db';
 
 // Generate mock results if database fails
 function generateMockResults(assessmentId: string) {
@@ -61,8 +62,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Try to get data from database
     try {
-      const { query } = await import('./lib/db');
-
       const result = await query(
         'SELECT * FROM assessments WHERE id = $1',
         [assessmentId]

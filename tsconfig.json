@@ -12,7 +12,11 @@
     "resolveJsonModule": true,
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "*": ["node_modules/*", "api/*"]
+    }
   },
   "include": [
     "api/**/*"
