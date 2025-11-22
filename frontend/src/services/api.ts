@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export interface AssessmentResponse {
   questionId: string;
@@ -81,16 +81,38 @@ api.interceptors.response.use(
 );
 
 export const assessmentApi = {
+  // Simple assessment submission (new endpoint)
+  submitSimpleAssessment: async (data: {
+    company_name: string;
+    email: string;
+    company_size?: string;
+    industry?: string;
+  }): Promise<any> => {
+    const response = await api.post('/assessment', data);
+    return response.data;
+  },
+
   // Get assessment questions
   getQuestions: async (): Promise<{ dimensions: Dimension[]; totalQuestions: number }> => {
     const response = await api.get('/assessment/questions');
     return response.data.data;
   },
 
-  // Start new assessment
+  // Start new assessment (using simple endpoint)
   startAssessment: async (data: AssessmentData): Promise<{ assessmentId: string; createdAt: string }> => {
-    const response = await api.post('/assessment/start', data);
-    return response.data.data;
+    // Map frontend data format to API format
+    const apiData = {
+      company_name: data.companyName,
+      email: data.email,
+      company_size: data.companySize,
+      industry: data.industry
+    };
+    const response = await api.post('/assessment', apiData);
+    // Map response back to expected format
+    return {
+      assessmentId: response.data.assessment.id,
+      createdAt: response.data.assessment.created_at
+    };
   },
 
   // Submit assessment responses
@@ -111,6 +133,27 @@ export const assessmentApi = {
   // Get PDF report URL
   getPDFUrl: (assessmentId: string): string => {
     return `${API_BASE_URL}/assessment/${assessmentId}/pdf`;
+  },
+
+  // Send assessment report via email
+  sendReport: async (data: {
+    email: string;
+    name: string;
+    organization?: string;
+    phone?: string;
+    scores: {
+      strategicClarity: number;
+      teamCapability: number;
+      governanceReadiness: number;
+      technicalInfrastructure: number;
+      executiveAlignment: number;
+      overall: number;
+    };
+    recommendations?: string[];
+    readinessPhase?: string;
+  }): Promise<{ success: boolean; message: string; email: string; pdfGenerated?: boolean }> => {
+    const response = await api.post('/send-report', data);
+    return response.data;
   },
 };
 
