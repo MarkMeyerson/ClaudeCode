@@ -1,0 +1,450 @@
+name: Continuous Deployment
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  KUBERNETES_VERSION: '1.28'
+  HELM_VERSION: 'v3.13.0'
+
+jobs:
+  prepare:
+    name: Prepare Deployment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      version: ${{ steps.set-version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine environment
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+          else
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine version
+        id: set-version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          else
+            echo "version=$(git describe --tags --always --dirty)" >> $GITHUB_OUTPUT
+          fi
+
+  deploy-infrastructure:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: [prepare]
+    environment:
+      name: ${{ needs.prepare.outputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+      - name: Create namespace
+        run: |
+          kubectl apply -f infrastructure/kubernetes/namespace.yaml
+
+      - name: Create secrets
+        run: |
+          kubectl create secret generic database-credentials \
+            --from-literal=username=${{ secrets.DB_USERNAME }} \
+            --from-literal=password=${{ secrets.DB_PASSWORD }} \
+            --from-literal=assessment-db-url=${{ secrets.ASSESSMENT_DB_URL }} \
+            --from-literal=donor-db-url=${{ secrets.DONOR_DB_URL }} \
+            --from-literal=financial-db-url=${{ secrets.FINANCIAL_DB_URL }} \
+            --from-literal=volunteer-db-url=${{ secrets.VOLUNTEER_DB_URL }} \
+            --from-literal=grant-db-url=${{ secrets.GRANT_DB_URL }} \
+            --from-literal=impact-db-url=${{ secrets.IMPACT_DB_URL }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic redis-credentials \
+            --from-literal=url=${{ secrets.REDIS_URL }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic rabbitmq-credentials \
+            --from-literal=url=${{ secrets.RABBITMQ_URL }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic jwt-secrets \
+            --from-literal=access-secret=${{ secrets.JWT_SECRET }} \
+            --from-literal=refresh-secret=${{ secrets.JWT_REFRESH_SECRET }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic encryption-keys \
+            --from-literal=primary-key=${{ secrets.ENCRYPTION_KEY }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic integration-secrets \
+            --from-literal=stripe-secret-key=${{ secrets.STRIPE_SECRET_KEY }} \
+            --from-literal=notion-api-key=${{ secrets.NOTION_API_KEY }} \
+            --from-literal=hubspot-api-key=${{ secrets.HUBSPOT_API_KEY }} \
+            --from-literal=quickbooks-consumer-key=${{ secrets.QUICKBOOKS_CONSUMER_KEY }} \
+            --from-literal=quickbooks-consumer-secret=${{ secrets.QUICKBOOKS_CONSUMER_SECRET }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy PostgreSQL
+        run: |
+          kubectl apply -f infrastructure/kubernetes/postgres-statefulset.yaml
+
+      - name: Wait for PostgreSQL
+        run: |
+          kubectl wait --for=condition=ready pod -l app=postgres --timeout=300s
+
+      - name: Deploy Redis
+        run: |
+          kubectl apply -f infrastructure/kubernetes/redis-deployment.yaml
+
+      - name: Deploy RabbitMQ
+        run: |
+          kubectl apply -f infrastructure/kubernetes/rabbitmq-deployment.yaml
+
+      - name: Deploy Elasticsearch
+        run: |
+          kubectl apply -f infrastructure/kubernetes/elasticsearch-deployment.yaml
+
+  run-migrations:
+    name: Run Database Migrations
+    runs-on: ubuntu-latest
+    needs: [prepare, deploy-infrastructure]
+    environment:
+      name: ${{ needs.prepare.outputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8.x'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Backup databases
+        run: |
+          # Create backup before migration
+          pnpm run db:backup
+
+      - name: Run migrations
+        env:
+          ASSESSMENT_DB_URL: ${{ secrets.ASSESSMENT_DB_URL }}
+          DONOR_DB_URL: ${{ secrets.DONOR_DB_URL }}
+          FINANCIAL_DB_URL: ${{ secrets.FINANCIAL_DB_URL }}
+          VOLUNTEER_DB_URL: ${{ secrets.VOLUNTEER_DB_URL }}
+          GRANT_DB_URL: ${{ secrets.GRANT_DB_URL }}
+          IMPACT_DB_URL: ${{ secrets.IMPACT_DB_URL }}
+        run: |
+          pnpm run migrate:up
+
+      - name: Verify migrations
+        run: |
+          pnpm run migrate:status
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          pnpm run migrate:down
+          pnpm run db:restore
+
+  deploy-services:
+    name: Deploy Services
+    runs-on: ubuntu-latest
+    needs: [prepare, deploy-infrastructure, run-migrations]
+    environment:
+      name: ${{ needs.prepare.outputs.environment }}
+
+    strategy:
+      matrix:
+        service:
+          - assessment-engine
+          - donor-management
+          - volunteer-coordinator
+          - grant-intelligence
+          - impact-analytics
+          - financial-hub
+          - content-orchestrator
+          - board-governance
+          - security-compliance
+      max-parallel: 3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+      - name: Update deployment image
+        run: |
+          kubectl set image deployment/${{ matrix.service }} \
+            ${{ matrix.service }}=naios-platform/${{ matrix.service }}:${{ github.sha }} \
+            --namespace=naios-platform
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f infrastructure/kubernetes/${{ matrix.service }}-deployment.yaml
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/${{ matrix.service }} \
+            --namespace=naios-platform \
+            --timeout=600s
+
+      - name: Verify deployment
+        run: |
+          kubectl get pods -l app=${{ matrix.service }} --namespace=naios-platform
+          kubectl get service ${{ matrix.service }} --namespace=naios-platform
+
+  deploy-ingress:
+    name: Deploy Ingress
+    runs-on: ubuntu-latest
+    needs: [prepare, deploy-services]
+    environment:
+      name: ${{ needs.prepare.outputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+      - name: Deploy Ingress
+        run: |
+          kubectl apply -f infrastructure/kubernetes/ingress.yaml
+
+      - name: Wait for Ingress
+        run: |
+          kubectl wait --for=condition=ready ingress/naios-ingress \
+            --namespace=naios-platform \
+            --timeout=300s
+
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [prepare, deploy-services, deploy-ingress]
+    environment:
+      name: ${{ needs.prepare.outputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8.x'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run smoke tests
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          pnpm run test:smoke
+
+      - name: Test health endpoints
+        run: |
+          services=("assessment-engine" "donor-management" "volunteer-coordinator" "grant-intelligence" "impact-analytics" "financial-hub" "content-orchestrator" "board-governance" "security-compliance")
+
+          for service in "${services[@]}"; do
+            echo "Testing $service health endpoint..."
+            response=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.API_BASE_URL }}/$service/health)
+            if [ "$response" -ne 200 ]; then
+              echo "Health check failed for $service (HTTP $response)"
+              exit 1
+            fi
+          done
+
+      - name: Test critical API endpoints
+        run: |
+          # Test authentication
+          curl -f ${{ secrets.API_BASE_URL }}/auth/health || exit 1
+
+          # Test core services
+          curl -f ${{ secrets.API_BASE_URL }}/assessment-engine/health || exit 1
+          curl -f ${{ secrets.API_BASE_URL }}/donor-management/health || exit 1
+
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [prepare, smoke-tests]
+    if: needs.prepare.outputs.environment == 'staging'
+    environment:
+      name: staging
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run k6 load tests
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: tests/performance/load-test.js
+          cloud: true
+          token: ${{ secrets.K6_CLOUD_TOKEN }}
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: k6-results
+          path: results/
+          retention-days: 30
+
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    needs: [prepare, deploy-services, smoke-tests]
+    if: failure()
+    environment:
+      name: ${{ needs.prepare.outputs.environment }}
+
+    strategy:
+      matrix:
+        service:
+          - assessment-engine
+          - donor-management
+          - volunteer-coordinator
+          - grant-intelligence
+          - impact-analytics
+          - financial-hub
+          - content-orchestrator
+          - board-governance
+          - security-compliance
+
+    steps:
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+      - name: Rollback deployment
+        run: |
+          kubectl rollout undo deployment/${{ matrix.service }} \
+            --namespace=naios-platform
+
+      - name: Wait for rollback
+        run: |
+          kubectl rollout status deployment/${{ matrix.service }} \
+            --namespace=naios-platform \
+            --timeout=600s
+
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [prepare, deploy-services, smoke-tests, performance-tests]
+    if: always()
+    environment:
+      name: ${{ needs.prepare.outputs.environment }}
+
+    steps:
+      - name: Check deployment status
+        id: check
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') }}" == "true" ]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+          elif [ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]; then
+            echo "status=cancelled" >> $GITHUB_OUTPUT
+          else
+            echo "status=success" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ steps.check.outputs.status }}
+          text: |
+            Deployment to ${{ needs.prepare.outputs.environment }} ${{ steps.check.outputs.status }}
+            Version: ${{ needs.prepare.outputs.version }}
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Create GitHub deployment
+        if: steps.check.outputs.status == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+              environment: '${{ needs.prepare.outputs.environment }}',
+              auto_merge: false,
+              required_contexts: [],
+              description: 'Deployment v${{ needs.prepare.outputs.version }}'
+            });
+
+      - name: Send email notification
+        if: steps.check.outputs.status == 'failure'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: 'NAIOS Deployment Failed: ${{ needs.prepare.outputs.environment }}'
+          to: ${{ secrets.ALERT_EMAIL }}
+          from: NAIOS CI/CD
+          body: |
+            Deployment to ${{ needs.prepare.outputs.environment }} has failed.
+
+            Version: ${{ needs.prepare.outputs.version }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+
+            Please check the GitHub Actions logs for details.

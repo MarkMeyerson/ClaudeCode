@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "vercel dev",
     "build": "echo 'Serverless functions build automatically'",
+    "build": "tsc --noEmit",
+    "build:all": "cd frontend && npm ci && npm run build",
     "deploy": "vercel --prod"
   },
   "dependencies": {

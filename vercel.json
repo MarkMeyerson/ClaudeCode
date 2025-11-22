@@ -11,13 +11,39 @@
       "source": "/api/assessment/start",
       "destination": "/api/save-lead"
     },
+  "buildCommand": "npm ci --legacy-peer-deps && cd frontend && npm ci --legacy-peer-deps && npm run build",
+  "outputDirectory": "frontend/dist",
+  "framework": "vite",
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "headers": [
     {
-      "source": "/api/assessment/:id/submit",
-      "destination": "/api/submit-assessment?id=:id"
-    },
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
     {
-      "source": "/api/assessment/:id/results",
-      "destination": "/api/get-results?id=:id"
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
     }
   ]
 }

@@ -1,0 +1,341 @@
+groups:
+  - name: naios_platform_alerts
+    interval: 30s
+    rules:
+      # ========================================================================
+      # HTTP / API ALERTS
+      # ========================================================================
+
+      - alert: HighHTTPErrorRate
+        expr: |
+          (
+            sum(rate(naios_http_requests_total{status_code=~"5.."}[5m])) by (service)
+            /
+            sum(rate(naios_http_requests_total[5m])) by (service)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "High HTTP 5xx error rate on {{ $labels.service }}"
+          description: "Service {{ $labels.service }} is experiencing {{ $value | humanizePercentage }} error rate (threshold: 5%)"
+
+      - alert: HighHTTPLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(naios_http_request_duration_seconds_bucket[5m])) by (service, le)
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High HTTP latency on {{ $labels.service }}"
+          description: "95th percentile latency is {{ $value }}s on {{ $labels.service }} (threshold: 1s)"
+
+      - alert: HighHTTPLatencyCritical
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(naios_http_request_duration_seconds_bucket[5m])) by (service, le)
+          ) > 3
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "Critical HTTP latency on {{ $labels.service }}"
+          description: "95th percentile latency is {{ $value }}s on {{ $labels.service }} (threshold: 3s)"
+
+      - alert: HighHTTPRequestRate
+        expr: sum(rate(naios_http_requests_total[5m])) by (service) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Unusually high request rate on {{ $labels.service }}"
+          description: "{{ $labels.service }} is receiving {{ $value }} requests/second"
+
+      # ========================================================================
+      # DATABASE ALERTS
+      # ========================================================================
+
+      - alert: HighDatabaseQueryLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(naios_db_query_duration_seconds_bucket[5m])) by (service, operation, le)
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database query latency on {{ $labels.service }}"
+          description: "95th percentile DB query latency is {{ $value }}s for {{ $labels.operation }} operations"
+
+      - alert: DatabaseConnectionPoolExhausted
+        expr: naios_db_pool_waiting > 10
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection pool exhausted on {{ $labels.service }}"
+          description: "{{ $value }} clients waiting for database connections"
+
+      - alert: HighDatabaseErrorRate
+        expr: |
+          (
+            sum(rate(naios_db_queries_total{status="error"}[5m])) by (service)
+            /
+            sum(rate(naios_db_queries_total[5m])) by (service)
+          ) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "High database error rate on {{ $labels.service }}"
+          description: "{{ $value | humanizePercentage }} of database queries are failing"
+
+      - alert: LowDatabasePoolUtilization
+        expr: |
+          (
+            (naios_db_pool_size - naios_db_pool_idle)
+            /
+            naios_db_pool_size
+          ) < 0.1
+        for: 30m
+        labels:
+          severity: info
+          component: database
+        annotations:
+          summary: "Low database pool utilization on {{ $labels.service }}"
+          description: "Database pool is underutilized ({{ $value | humanizePercentage }}). Consider reducing pool size."
+
+      # ========================================================================
+      # CACHE ALERTS
+      # ========================================================================
+
+      - alert: LowCacheHitRate
+        expr: |
+          (
+            sum(rate(naios_cache_hits_total[5m])) by (service)
+            /
+            (
+              sum(rate(naios_cache_hits_total[5m])) by (service)
+              +
+              sum(rate(naios_cache_misses_total[5m])) by (service)
+            )
+          ) < 0.7
+        for: 15m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Low cache hit rate on {{ $labels.service }}"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} (threshold: 70%)"
+
+      - alert: HighCacheLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(naios_cache_operation_duration_seconds_bucket[5m])) by (service, le)
+          ) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "High cache operation latency on {{ $labels.service }}"
+          description: "95th percentile cache latency is {{ $value }}s (threshold: 0.1s)"
+
+      # ========================================================================
+      # SYSTEM ALERTS
+      # ========================================================================
+
+      - alert: HighErrorRate
+        expr: sum(rate(naios_errors_total[5m])) by (service, severity) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "High error rate on {{ $labels.service }}"
+          description: "{{ $value }} errors/second with severity {{ $labels.severity }}"
+
+      - alert: CriticalErrorsDetected
+        expr: sum(rate(naios_errors_total{severity="critical"}[5m])) by (service) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: application
+        annotations:
+          summary: "Critical errors on {{ $labels.service }}"
+          description: "{{ $value }} critical errors/second detected"
+
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            process_resident_memory_bytes
+            /
+            (process_resident_memory_bytes + process_virtual_memory_bytes)
+          ) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage on {{ $labels.service }}"
+          description: "Memory usage is at {{ $value | humanizePercentage }}"
+
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage on {{ $labels.service }}"
+          description: "CPU usage is at {{ $value | humanizePercentage }}"
+
+      # ========================================================================
+      # AUTHENTICATION ALERTS
+      # ========================================================================
+
+      - alert: HighAuthenticationFailureRate
+        expr: |
+          (
+            sum(rate(naios_auth_attempts_total{status="failed"}[5m])) by (service)
+            /
+            sum(rate(naios_auth_attempts_total[5m])) by (service)
+          ) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "High authentication failure rate on {{ $labels.service }}"
+          description: "{{ $value | humanizePercentage }} of authentication attempts are failing"
+
+      - alert: SuspiciousAuthenticationActivity
+        expr: sum(rate(naios_auth_attempts_total{status="failed"}[1m])) by (service) > 50
+        for: 2m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Suspicious authentication activity on {{ $labels.service }}"
+          description: "{{ $value }} failed authentication attempts/second. Possible brute force attack."
+
+      - alert: HighRateLimitHits
+        expr: sum(rate(naios_rate_limit_hits_total[5m])) by (service) > 100
+        for: 10m
+        labels:
+          severity: info
+          component: security
+        annotations:
+          summary: "High rate limit hits on {{ $labels.service }}"
+          description: "{{ $value }} rate limit hits/second"
+
+      # ========================================================================
+      # BUSINESS METRICS ALERTS
+      # ========================================================================
+
+      - alert: NoRecentDonations
+        expr: |
+          (time() - max(timestamp(naios_donations_received_total)) by (service)) > 86400
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "No donations received in 24 hours"
+          description: "No donations have been recorded in the last 24 hours"
+
+      - alert: LowGrantSuccessRate
+        expr: |
+          (
+            sum(increase(naios_grant_applications_awarded_total[30d]))
+            /
+            sum(increase(naios_grant_applications_submitted_total[30d]))
+          ) < 0.2
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "Low grant success rate"
+          description: "Grant success rate is {{ $value | humanizePercentage }} (threshold: 20%)"
+
+      - alert: DecreasingVolunteerEngagement
+        expr: |
+          (
+            avg_over_time(naios_active_volunteers[7d])
+            /
+            avg_over_time(naios_active_volunteers[30d])
+          ) < 0.8
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "Decreasing volunteer engagement"
+          description: "Active volunteers decreased by {{ (1 - $value) | humanizePercentage }} compared to 30-day average"
+
+      # ========================================================================
+      # WEBSOCKET ALERTS
+      # ========================================================================
+
+      - alert: HighWebSocketConnectionCount
+        expr: naios_websocket_connections > 10000
+        for: 5m
+        labels:
+          severity: warning
+          component: websocket
+        annotations:
+          summary: "High WebSocket connection count on {{ $labels.service }}"
+          description: "{{ $value }} active WebSocket connections"
+
+      - alert: WebSocketMessageBacklog
+        expr: |
+          rate(naios_websocket_messages_received_total[5m])
+          /
+          rate(naios_websocket_messages_sent_total[5m])
+        > 1.2
+        for: 10m
+        labels:
+          severity: warning
+          component: websocket
+        annotations:
+          summary: "WebSocket message backlog on {{ $labels.service }}"
+          description: "Messages are being received faster than they can be sent"
+
+      # ========================================================================
+      # BACKGROUND JOB ALERTS
+      # ========================================================================
+
+      - alert: HighJobFailureRate
+        expr: |
+          (
+            sum(rate(naios_jobs_processed_total{status="failed"}[5m])) by (service, job_type)
+            /
+            sum(rate(naios_jobs_processed_total[5m])) by (service, job_type)
+          ) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: jobs
+        annotations:
+          summary: "High job failure rate on {{ $labels.service }}"
+          description: "{{ $value | humanizePercentage }} of {{ $labels.job_type }} jobs are failing"
+
+      - alert: LongRunningJob
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(naios_job_duration_seconds_bucket[5m])) by (service, job_type, le)
+          ) > 600
+        for: 10m
+        labels:
+          severity: warning
+          component: jobs
+        annotations:
+          summary: "Long running jobs on {{ $labels.service }}"
+          description: "95th percentile job duration is {{ $value }}s for {{ $labels.job_type }}"
