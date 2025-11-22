@@ -16,10 +16,6 @@
       "destination": "/api/get-results?id=:id"
     },
     {
-      "source": "/api/assessment/start",
-      "destination": "/api/save-lead"
-    },
-    {
       "source": "/api/assessment",
       "destination": "/api/save-lead"
     },
