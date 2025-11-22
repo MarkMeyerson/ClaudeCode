@@ -8,16 +8,20 @@
       "destination": "/api/get-questions"
     },
     {
-      "source": "/api/assessment/start",
-      "destination": "/api/save-lead"
-    },
-    {
       "source": "/api/assessment/:id/submit",
       "destination": "/api/submit-assessment?id=:id"
     },
     {
       "source": "/api/assessment/:id/results",
       "destination": "/api/get-results?id=:id"
+    },
+    {
+      "source": "/api/assessment/start",
+      "destination": "/api/save-lead"
+    },
+    {
+      "source": "/api/assessment",
+      "destination": "/api/save-lead"
     },
     {
       "source": "/api/send-report",
