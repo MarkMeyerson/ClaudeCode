@@ -61,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Try to get data from database
     try {
-      const { query } = await import('./lib/db');
+      const { query } = await import('./_lib/db');
 
       const result = await query(
         'SELECT * FROM assessments WHERE id = $1',

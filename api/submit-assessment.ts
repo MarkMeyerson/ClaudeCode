@@ -77,7 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
       // Try to use the real scoring if available
-      const { calculateAssessmentScore } = await import('./lib/scoring');
+      const { calculateAssessmentScore } = await import('./_lib/scoring');
 
       // Convert answers object to responses array if needed
       let responsesArray = assessmentData;
@@ -102,7 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Try to save to database, but don't fail if it doesn't work
     try {
-      const { query } = await import('./lib/db');
+      const { query } = await import('./_lib/db');
 
       // Try to update assessment in database
       await query(
