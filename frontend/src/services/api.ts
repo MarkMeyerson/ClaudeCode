@@ -134,6 +134,27 @@ export const assessmentApi = {
   getPDFUrl: (assessmentId: string): string => {
     return `${API_BASE_URL}/assessment/${assessmentId}/pdf`;
   },
+
+  // Send assessment report via email
+  sendReport: async (data: {
+    email: string;
+    name: string;
+    organization?: string;
+    phone?: string;
+    scores: {
+      strategicClarity: number;
+      teamCapability: number;
+      governanceReadiness: number;
+      technicalInfrastructure: number;
+      executiveAlignment: number;
+      overall: number;
+    };
+    recommendations?: string[];
+    readinessPhase?: string;
+  }): Promise<{ success: boolean; message: string; email: string; pdfGenerated?: boolean }> => {
+    const response = await api.post('/send-report', data);
+    return response.data;
+  },
 };
 
 export default api;

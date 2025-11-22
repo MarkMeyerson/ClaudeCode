@@ -12,6 +12,10 @@
     "deploy": "vercel --prod"
   },
   "dependencies": {
+    "@azure/identity": "^4.13.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.4",
     "pg": "^8.11.3"
   },
   "devDependencies": {
