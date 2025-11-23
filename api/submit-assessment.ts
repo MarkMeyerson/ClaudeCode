@@ -135,23 +135,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       success: true,
       results: {
         strategic_clarity: {
-          score: assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'strategic_clarity')?.score || 65,
+          score: assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'strategic_clarity')?.score || 0,
           description: 'Good understanding of AI strategy and goals'
         },
         governance_readiness: {
-          score: assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'governance_readiness')?.score || 58,
+          score: assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'governance_readiness')?.score || 0,
           description: 'Governance framework needs development'
         },
         team_capability: {
-          score: assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'team_capability')?.score || 62,
+          score: assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'team_capability')?.score || 0,
           description: 'Team has foundational AI knowledge'
         },
         technical_infrastructure: {
-          score: assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'technical_infrastructure')?.score || 70,
+          score: assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'technical_infrastructure')?.score || 0,
           description: 'Solid technical foundation'
         },
         executive_alignment: {
-          score: assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'executive_alignment')?.score || 68,
+          score: assessmentScore.dimensionScores.find((d: DimensionScore) => d.dimension === 'executive_alignment')?.score || 0,
           description: 'Leadership is aligned on AI initiatives'
         }
       },

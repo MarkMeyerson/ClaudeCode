@@ -67,12 +67,59 @@ const ResultsPage: React.FC = () => {
     }
   };
 
-  const handleDownloadPDF = () => {
-    if (!assessmentId) return;
+  const handleDownloadPDF = async () => {
+    if (!results) return;
     setDownloadingPDF(true);
-    const pdfUrl = assessmentApi.getPDFUrl(assessmentId);
-    window.open(pdfUrl, '_blank');
-    setTimeout(() => setDownloadingPDF(false), 1000);
+
+    try {
+      const { assessment, score } = results;
+
+      // Map dimension scores to the format expected by the API
+      const scores = {
+        strategicClarity: score.dimensionScores.find((d: DimensionScore) => d.dimension === 'strategic_clarity')?.score || 0,
+        teamCapability: score.dimensionScores.find((d: DimensionScore) => d.dimension === 'team_capability')?.score || 0,
+        governanceReadiness: score.dimensionScores.find((d: DimensionScore) => d.dimension === 'governance_readiness')?.score || 0,
+        technicalInfrastructure: score.dimensionScores.find((d: DimensionScore) => d.dimension === 'technical_infrastructure')?.score || 0,
+        executiveAlignment: score.dimensionScores.find((d: DimensionScore) => d.dimension === 'executive_alignment')?.score || 0,
+        overall: score.totalScore || 0,
+      };
+
+      // Make POST request to send-report with download=true
+      const response = await fetch('/api/send-report?download=true', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: assessment.email,
+          name: assessment.companyName || 'Valued Client',
+          organization: assessment.companyName,
+          scores,
+          readinessPhase: score.readinessPhase,
+          recommendations: score.recommendations,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+
+      // Get PDF blob and trigger download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'AI-Readiness-Assessment-Report.pdf';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('PDF download failed:', error);
+      alert('Failed to download PDF. Please try again.');
+    } finally {
+      setDownloadingPDF(false);
+    }
   };
 
   const getPhaseColor = (phase: string): string => {
@@ -339,7 +386,7 @@ const ResultsPage: React.FC = () => {
                 Discuss your results with our AI experts and create a customized roadmap.
               </p>
               <a
-                href="https://sherpatech.ai/contact"
+                href="https://book.sherpatech.ai"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block w-full btn btn-primary bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
