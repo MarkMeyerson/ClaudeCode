@@ -1,9 +1,9 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders } from './lib/cors';
-import { sendEmail } from './lib/microsoftGraph';
-import { generateEmailHTML, generateEmailPlainText } from './lib/emailTemplates';
-import { generatePDF } from './lib/generatePDF';
-import { sendToHubSpot } from './lib/hubspot';
+import { setCorsHeaders } from './_lib/cors';
+import { sendEmail } from './_lib/microsoftGraph';
+import { generateEmailHTML, generateEmailPlainText } from './_lib/emailTemplates';
+import { generatePDF } from './_lib/generatePDF';
+import { sendToHubSpot } from './_lib/hubspot';
 
 interface SendReportRequest {
   email: string;
