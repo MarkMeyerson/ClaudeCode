@@ -81,17 +81,6 @@ api.interceptors.response.use(
 );
 
 export const assessmentApi = {
-  // Simple assessment submission (new endpoint)
-  submitSimpleAssessment: async (data: {
-    company_name: string;
-    email: string;
-    company_size?: string;
-    industry?: string;
-  }): Promise<any> => {
-    const response = await api.post('/assessment', data);
-    return response.data;
-  },
-
   // Get assessment questions
   getQuestions: async (): Promise<{ dimensions: Dimension[]; totalQuestions: number }> => {
     const response = await api.get('/assessment/questions');
@@ -100,18 +89,12 @@ export const assessmentApi = {
 
   // Start new assessment (using simple endpoint)
   startAssessment: async (data: AssessmentData): Promise<{ assessmentId: string; createdAt: string }> => {
-    // Map frontend data format to API format
-    const apiData = {
-      company_name: data.companyName,
-      email: data.email,
-      company_size: data.companySize,
-      industry: data.industry
-    };
-    const response = await api.post('/assessment', apiData);
+    // Send all required fields to save-lead endpoint
+    const response = await api.post('/assessment', data);
     // Map response back to expected format
     return {
-      assessmentId: response.data.assessment.id,
-      createdAt: response.data.assessment.created_at
+      assessmentId: response.data.data.assessmentId,
+      createdAt: response.data.data.createdAt
     };
   },
 
