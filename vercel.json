@@ -1,16 +1,4 @@
 {
-  "buildCommand": "cd frontend && npm run build",
-  "outputDirectory": "frontend/dist",
-  "installCommand": "npm ci --include=dev && cd frontend && npm ci --include=dev",
-  "rewrites": [
-    {
-      "source": "/api/assessment/questions",
-      "destination": "/api/get-questions"
-    },
-    {
-      "source": "/api/assessment/start",
-      "destination": "/api/save-lead"
-    },
   "buildCommand": "npm ci --legacy-peer-deps && cd frontend && npm ci --legacy-peer-deps && npm run build",
   "outputDirectory": "frontend/dist",
   "framework": "vite",
@@ -41,6 +29,14 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/assessment/questions",
+      "destination": "/api/get-questions"
+    },
+    {
+      "source": "/api/assessment/start",
+      "destination": "/api/save-lead"
+    },
     {
       "source": "/api/(.*)",
       "destination": "/api/$1"
