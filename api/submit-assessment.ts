@@ -89,11 +89,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       // Convert answers object to responses array if needed
       let responsesArray = assessmentData;
-      if (!Array.isArray(assessmentData)) {
+
+      // If it's already an array, normalize the field names
+      if (Array.isArray(assessmentData)) {
+        // Frontend sends { questionId, dimension, answerValue }
+        // Scoring expects { questionId, dimension, value }
+        responsesArray = assessmentData.map((response: any) => ({
+          questionId: response.questionId,
+          dimension: response.dimension,
+          value: response.answerValue || response.value || 0
+        }));
+      } else {
         // Convert { questionId: answer } to array format
         responsesArray = Object.entries(assessmentData).map(([questionId, answer]: [string, any]) => ({
           questionId,
-          value: typeof answer === 'number' ? answer : answer.value || 0,
+          value: typeof answer === 'number' ? answer : answer.value || answer.answerValue || 0,
           dimension: questionId.startsWith('sc_') ? 'strategic_clarity' :
                      questionId.startsWith('gr_') ? 'governance_readiness' :
                      questionId.startsWith('tc_') ? 'team_capability' :
