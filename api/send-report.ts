@@ -1,9 +1,9 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders } from './lib/cors';
-import { sendEmail } from './lib/microsoftGraph';
-import { generateEmailHTML, generateEmailPlainText } from './lib/emailTemplates';
-import { generatePDF } from './lib/generatePDF';
-import { sendToHubSpot } from './lib/hubspot';
+import { setCorsHeaders } from './_lib/cors';
+import { sendEmail } from './_lib/microsoftGraph';
+import { generateEmailHTML } from './_lib/emailTemplates';
+import { generatePDF } from './_lib/generatePDF';
+import { sendToHubSpot } from './_lib/hubspot';
 
 interface SendReportRequest {
   email: string;
@@ -87,8 +87,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Determine readiness phase if not provided
     const readinessPhase = requestData.readinessPhase || getReadinessPhase(requestData.scores.overall);
 
-    console.log(`Processing report request for ${requestData.email}`);
-
     // Generate email HTML
     const htmlContent = generateEmailHTML({
       name: requestData.name,
@@ -99,7 +97,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Generate PDF report
     let pdfBase64: string | null = null;
     try {
-      console.log('Generating PDF report...');
       pdfBase64 = generatePDF({
         name: requestData.name,
         organization: requestData.organization,
@@ -113,7 +110,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         readinessPhase,
         recommendations: requestData.recommendations,
       });
-      console.log('PDF generated successfully');
     } catch (pdfError: any) {
       console.error('PDF generation failed:', pdfError);
       // For download mode, this is a critical error
@@ -170,8 +166,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       await sendEmail(emailOptions);
-
-      console.log(`Email sent successfully to ${requestData.email}`);
 
       // Send lead data to HubSpot (async, don't wait for it)
       sendToHubSpot({

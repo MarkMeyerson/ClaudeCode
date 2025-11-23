@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders, handleError } from './lib/cors';
-import { query } from './lib/db';
+import { setCorsHeaders, handleError } from './_lib/cors';
+import { query } from './_lib/db';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Handle CORS

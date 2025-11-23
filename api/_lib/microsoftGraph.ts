@@ -102,7 +102,6 @@ export async function sendEmail(params: {
 
   try {
     await client.api(`/users/${senderEmail}/sendMail`).post(message);
-    console.log(`Email sent successfully to ${params.to.email}`);
   } catch (error: any) {
     console.error("Failed to send email via Microsoft Graph:", error);
     throw new Error(
