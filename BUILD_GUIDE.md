@@ -10,15 +10,22 @@
 
 ```
 /
-├── api/                    # Vercel serverless functions (MAX 5 files)
+├── api/                    # Vercel serverless functions (MAX 12 files)
 │   ├── send-report.ts     # Email & PDF download endpoint
 │   ├── get-questions.ts   # Assessment questions endpoint
 │   ├── save-lead.ts       # Lead capture endpoint
-│   └── _lib/              # Helper functions (NOT counted as serverless functions)
+│   ├── get-results.ts     # Get assessment results
+│   ├── submit-assessment.ts # Submit assessment answers
+│   ├── assessment.js      # Legacy assessment handler
+│   └── _lib/              # Helper functions (underscore = NOT counted!)
 │       ├── cors.ts
+│       ├── db.ts
+│       ├── emailTemplates.ts
 │       ├── generatePDF.ts
+│       ├── hubspot.ts
 │       ├── microsoftGraph.ts
-│       └── hubspot.ts
+│       ├── questions.ts
+│       └── scoring.ts
 │
 ├── frontend/              # React app (TypeScript + Vite)
 │   ├── src/
@@ -31,10 +38,12 @@
 └── BUILD_GUIDE.md         # This file
 ```
 
-**Important:**
-- `/api` folder can contain MAX 5 serverless function files (Vercel free tier limit: 12)
-- Helper functions go in `/api/_lib` (underscore prefix = not counted as serverless)
+**CRITICAL RULES:**
+- `/api` folder can contain MAX 12 serverless function files (Vercel free tier limit)
+- **Helper functions MUST go in `/api/_lib`** (underscore prefix = NOT counted as serverless!)
+- **DO NOT use `/api/lib`** - files in `lib/` without underscore ARE counted as functions!
 - Frontend is a separate React + Vite app
+- Currently using 6 of 12 functions (6 endpoints + 8 helpers in _lib)
 
 ---
 
@@ -160,20 +169,33 @@ HUBSPOT_API_KEY=your-hubspot-key
 **Why:** installCommand already runs npm ci. Running it twice is redundant and can cause issues.
 **Fix:** buildCommand should only run `npm run build`.
 
-### ❌ MISTAKE 3: Adding more than 5 files in /api folder
+### ❌ MISTAKE 3: Putting helper files in api/lib instead of api/_lib
 ```
 api/
-├── endpoint1.ts
-├── endpoint2.ts
-├── endpoint3.ts
-├── endpoint4.ts
-├── endpoint5.ts
-├── endpoint6.ts  ❌ TOO MANY!
+├── get-questions.ts
+├── send-report.ts
+├── lib/              ❌ WRONG! Files in lib/ ARE counted as functions!
+│   ├── cors.ts       ❌ Counted as function #3
+│   ├── generatePDF.ts ❌ Counted as function #4
+│   └── hubspot.ts    ❌ Counted as function #5
 ```
-**Why:** Vercel free tier has 12 serverless function limit.
-**Fix:** Move helper functions to `api/_lib/` (underscore prefix = not counted).
+**Why:** Vercel counts ALL files in api/ as serverless functions unless prefixed with underscore.
+**Fix:** Use `api/_lib/` (with underscore) for helpers:
+```
+api/
+├── get-questions.ts   ✓ Function #1
+├── send-report.ts     ✓ Function #2
+├── _lib/              ✓ NOT counted!
+│   ├── cors.ts        ✓ Helper (not counted)
+│   ├── generatePDF.ts ✓ Helper (not counted)
+│   └── hubspot.ts     ✓ Helper (not counted)
+```
 
-### ❌ MISTAKE 4: Forgetting to URL-encode DATABASE_URL
+### ❌ MISTAKE 4: Adding more than 12 endpoint files in /api
+**Why:** Vercel free tier has 12 serverless function limit.
+**Fix:** Consolidate related functionality (e.g., send-report handles both email AND download via query param).
+
+### ❌ MISTAKE 5: Forgetting to URL-encode DATABASE_URL
 ```bash
 # WRONG:
 DATABASE_URL=postgres://user:p@ssw0rd!@host:5432/db
@@ -184,7 +206,7 @@ DATABASE_URL=postgres://user:p%40ssw0rd%21@host:6543/db
 **Why:** Special characters break connection string parsing.
 **Fix:** URL-encode: `@` → `%40`, `!` → `%21`, etc.
 
-### ❌ MISTAKE 5: Using port 5432 instead of 6543
+### ❌ MISTAKE 6: Using port 5432 instead of 6543
 ```bash
 # WRONG (direct connection):
 DATABASE_URL=postgres://user:pass@host:5432/db
@@ -195,7 +217,7 @@ DATABASE_URL=postgres://user:pass@host:6543/db
 **Why:** Serverless functions need transaction pooling (port 6543), not direct connections (5432).
 **Fix:** Always use port `6543` for Supabase/PostgreSQL in serverless.
 
-### ❌ MISTAKE 6: Missing package-lock.json
+### ❌ MISTAKE 7: Missing package-lock.json
 ```bash
 cd frontend
 ls package-lock.json  # Must exist!
