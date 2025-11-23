@@ -2,40 +2,45 @@
 
 ## SINGLE SOURCE OF TRUTH FOR BUILD CONFIGURATION
 
-**This document defines the correct build setup. DO NOT modify build commands without updating this guide.**
+**This document defines the correct build setup. DO NOT modify build commands without consulting this guide.**
 
 ---
 
-## Project Structure
+## 1. Project Structure
 
 ```
 /
-├── api/                    # Serverless API functions (auto-deployed by Vercel)
+├── api/                    # Vercel serverless functions (MAX 5 files)
 │   ├── send-report.ts     # Email & PDF download endpoint
 │   ├── get-questions.ts   # Assessment questions endpoint
 │   ├── save-lead.ts       # Lead capture endpoint
-│   └── lib/               # Shared utilities
+│   └── _lib/              # Helper functions (NOT counted as serverless functions)
 │       ├── cors.ts
 │       ├── generatePDF.ts
 │       ├── microsoftGraph.ts
 │       └── hubspot.ts
 │
-├── frontend/              # React frontend (Vite)
+├── frontend/              # React app (TypeScript + Vite)
 │   ├── src/
 │   ├── package.json       # Frontend dependencies
 │   ├── package-lock.json  # Frontend lockfile (MUST be committed)
 │   └── vite.config.ts
 │
-├── package.json           # Root package.json (NO build script!)
-├── vercel.json            # Vercel configuration (SINGLE SOURCE OF TRUTH)
+├── package.json           # Root package.json (for API dependencies)
+├── vercel.json            # Vercel configuration (see below)
 └── BUILD_GUIDE.md         # This file
 ```
 
+**Important:**
+- `/api` folder can contain MAX 5 serverless function files (Vercel free tier limit: 12)
+- Helper functions go in `/api/_lib` (underscore prefix = not counted as serverless)
+- Frontend is a separate React + Vite app
+
 ---
 
-## Vercel Configuration (`vercel.json`)
+## 2. Correct vercel.json Configuration
 
-### CORRECT Configuration
+### REQUIRED Configuration (SINGLE SOURCE OF TRUTH)
 
 ```json
 {
@@ -88,291 +93,307 @@
 
 ### Why These Settings?
 
-- **`buildCommand`**: Navigates to frontend and builds ONLY the React app
-  - Uses `npm ci` for clean, reproducible installs
-  - `cd frontend` ensures we're in the right directory
-  - `npm run build` runs Vite build
+- **`buildCommand`**: Only builds frontend (serverless functions auto-deploy)
+  - `cd frontend` - Navigate to frontend directory
+  - `npm ci` - Clean install from package-lock.json
+  - `npm run build` - Runs Vite build
 
-- **`installCommand`**: Installs frontend dependencies separately
-  - Vercel runs this before buildCommand
-  - Ensures package-lock.json is respected
+- **`outputDirectory`**: `frontend/dist` - Where Vite outputs built files
 
-- **`outputDirectory`**: Where Vercel finds built static files
-  - `frontend/dist` is where Vite outputs the build
+- **`framework: null`**: Disables Vercel's framework auto-detection
+  - Prevents Vercel from guessing wrong build commands
+  - We explicitly control the build process
 
-- **`framework: null`**: Disables auto-detection
-  - We handle the build ourselves
-  - Prevents Vercel from running wrong build commands
-
----
-
-## Root `package.json` Rules
-
-### ✅ CORRECT
-
-```json
-{
-  "name": "ai-readiness-assessment",
-  "version": "1.0.1",
-  "private": true,
-  "engines": {
-    "node": "20.x"
-  },
-  "scripts": {
-    "dev": "vercel dev",
-    "deploy": "vercel --prod"
-  },
-  "dependencies": {
-    "@azure/identity": "^4.13.0",
-    "@microsoft/microsoft-graph-client": "^3.0.7",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^3.0.4",
-    "pg": "^8.11.3"
-  },
-  "devDependencies": {
-    "@types/node": "^20.10.0",
-    "@types/pg": "^8.10.9",
-    "@vercel/node": "^3.0.11",
-    "typescript": "^5.3.2"
-  }
-}
-```
-
-### ❌ WRONG - Do NOT add these to root package.json:
-
-```json
-// ❌ NO build script in root!
-"scripts": {
-  "build": "tsc --noEmit",           // WRONG
-  "build": "echo 'Building...'",     // WRONG
-  "build:all": "cd frontend && ..."  // WRONG
-}
-```
-
-**WHY?** Vercel uses `vercel.json` buildCommand. Root package.json build scripts cause confusion.
+- **`installCommand`**: Install frontend dependencies separately
+  - Runs before buildCommand
+  - Ensures reproducible builds with package-lock.json
 
 ---
 
-## Environment Variables
+## 3. Environment Variables Required
 
-### Required Environment Variables (Vercel Dashboard)
+Set these in **Vercel Dashboard → Project → Settings → Environment Variables**
 
-Set these in: Vercel Dashboard → Project → Settings → Environment Variables
+### Database
+- **`DATABASE_URL`** - PostgreSQL connection string
+  - Format: `postgres://user:password@host:6543/database?sslmode=require`
+  - **IMPORTANT:** Use port `6543` (transaction pooler), NOT `5432`
+  - **IMPORTANT:** URL-encode special characters in password (e.g., `@` → `%40`)
 
-#### Microsoft Graph (Email Sending)
-- `AZURE_TENANT_ID` - Azure AD tenant ID
-- `AZURE_CLIENT_ID` - Azure app client ID
-- `AZURE_CLIENT_SECRET` - Azure app secret
-- `SENDER_EMAIL` - Email address to send from
+### Microsoft 365 / Azure AD (Email Sending)
+- **`AZURE_TENANT_ID`** - Azure AD tenant ID
+- **`AZURE_CLIENT_ID`** - Azure app client ID
+- **`AZURE_CLIENT_SECRET`** - Azure app secret
+- **`M365_SENDER_EMAIL`** - Email address to send from (e.g., `noreply@sherpatech.ai`)
 
-#### HubSpot (Optional - CRM Integration)
-- `HUBSPOT_ACCESS_TOKEN` - HubSpot API token
+### HubSpot CRM (Optional)
+- **`HUBSPOT_API_KEY`** - HubSpot API key for lead capture
 
-#### Database (Optional - if using PostgreSQL)
-- `DATABASE_URL` - PostgreSQL connection string
-
-### Local Development (`.env`)
-
-Create a `.env` file in the root (DO NOT commit this):
+### Example `.env` (Local Development Only - DO NOT COMMIT)
 
 ```bash
+DATABASE_URL=postgres://user:password@localhost:6543/ai_readiness?sslmode=require
 AZURE_TENANT_ID=your-tenant-id
 AZURE_CLIENT_ID=your-client-id
 AZURE_CLIENT_SECRET=your-client-secret
-SENDER_EMAIL=noreply@sherpatech.ai
-HUBSPOT_ACCESS_TOKEN=your-hubspot-token
+M365_SENDER_EMAIL=noreply@sherpatech.ai
+HUBSPOT_API_KEY=your-hubspot-key
 ```
 
 ---
 
-## How Builds Work
+## 4. Common Mistakes to Avoid
 
-### 1. Vercel Detects Changes
-- Push to GitHub triggers build
-- Vercel clones repo
-
-### 2. Install Phase
-```bash
-# Vercel runs:
-cd frontend && npm ci
-```
-
-### 3. Build Phase
-```bash
-# Vercel runs:
-cd frontend && npm ci && npm run build
-```
-This executes `vite build` from `frontend/package.json`, which:
-- Compiles TypeScript
-- Bundles React app
-- Outputs to `frontend/dist/`
-
-### 4. Deploy Phase
-- Static files from `frontend/dist/` → CDN
-- API functions from `api/` → Serverless (automatic)
-
----
-
-## Common Mistakes to Avoid
-
-### ❌ Mistake 1: Wrong Build Command
+### ❌ MISTAKE 1: Running npm ci in root during build
 ```json
 // WRONG - Don't do this:
-"buildCommand": "npm run build"  // Tries to build root!
+"buildCommand": "npm ci && cd frontend && npm ci && npm run build"
 ```
-**Fix:** Use `cd frontend && npm ci && npm run build`
+**Why:** Root package.json only contains API dependencies (installed by Vercel automatically).
+**Fix:** Only run `npm ci` in frontend directory.
 
-### ❌ Mistake 2: Missing package-lock.json
+### ❌ MISTAKE 2: Adding more than 5 files in /api folder
+```
+api/
+├── endpoint1.ts
+├── endpoint2.ts
+├── endpoint3.ts
+├── endpoint4.ts
+├── endpoint5.ts
+├── endpoint6.ts  ❌ TOO MANY!
+```
+**Why:** Vercel free tier has 12 serverless function limit.
+**Fix:** Move helper functions to `api/_lib/` (underscore prefix = not counted).
+
+### ❌ MISTAKE 3: Forgetting to URL-encode DATABASE_URL
 ```bash
-# If frontend/package-lock.json is missing:
+# WRONG:
+DATABASE_URL=postgres://user:p@ssw0rd!@host:5432/db
+
+# CORRECT:
+DATABASE_URL=postgres://user:p%40ssw0rd%21@host:6543/db
+```
+**Why:** Special characters break connection string parsing.
+**Fix:** URL-encode: `@` → `%40`, `!` → `%21`, etc.
+
+### ❌ MISTAKE 4: Using port 5432 instead of 6543
+```bash
+# WRONG (direct connection):
+DATABASE_URL=postgres://user:pass@host:5432/db
+
+# CORRECT (transaction pooler):
+DATABASE_URL=postgres://user:pass@host:6543/db
+```
+**Why:** Serverless functions need transaction pooling (port 6543), not direct connections (5432).
+**Fix:** Always use port `6543` for Supabase/PostgreSQL in serverless.
+
+### ❌ MISTAKE 5: Missing package-lock.json
+```bash
 cd frontend
-npm install  # This regenerates it
-git add package-lock.json
-git commit -m "Add package-lock.json"
+ls package-lock.json  # Must exist!
 ```
-
-### ❌ Mistake 3: Duplicate Properties in JSON
-```json
-// WRONG - JSON doesn't allow duplicates:
-{
-  "buildCommand": "npm run build",
-  "buildCommand": "vite build"  // ❌ DUPLICATE
-}
-```
-
-### ❌ Mistake 4: Using `npm install` in Build
-```json
-// WRONG:
-"buildCommand": "cd frontend && npm install && npm run build"
-```
-**Fix:** Use `npm ci` for reproducible builds
-
-### ❌ Mistake 5: Multiple Build Configurations
-- Only use `vercel.json` for build config
-- Do NOT add build commands to:
-  - Root package.json
-  - `.vercelrc` (we don't use this)
-  - Vercel dashboard UI (use vercel.json instead)
+**Why:** `npm ci` requires package-lock.json for reproducible builds.
+**Fix:** Run `npm install` to generate it, then commit.
 
 ---
 
-## Deployment Checklist
+## 5. Deployment Checklist
 
-### Before Deploying
+### Before Deploying to Production
 
-- [ ] Verify `vercel.json` matches this guide
-- [ ] Verify root `package.json` has NO build script
+- [ ] Verify `vercel.json` matches Section 2 above
+- [ ] Verify all environment variables are set in Vercel dashboard (Section 3)
+- [ ] Verify `DATABASE_URL` uses port `6543` (transaction pooler)
+- [ ] Verify `DATABASE_URL` has URL-encoded special characters
+- [ ] Verify only 5 or fewer files in `/api` (not counting `_lib/`)
 - [ ] Verify `frontend/package-lock.json` exists and is committed
-- [ ] Verify environment variables are set in Vercel dashboard
-- [ ] Test locally with `vercel dev`
+- [ ] Test locally with `vercel dev` first
 
 ### Test Locally
 
 ```bash
-# 1. Install root dependencies (for API functions)
+# 1. Install API dependencies (root)
 npm ci
 
 # 2. Install frontend dependencies
 cd frontend
 npm ci
-
-# 3. Run Vercel dev server
 cd ..
+
+# 3. Run local Vercel dev server
 vercel dev
 ```
 
 Visit: `http://localhost:3000`
 
-### Deploy
+### Deploy to Production
 
 ```bash
-# Deploy to production
-vercel --prod
-
-# Or push to main branch (auto-deploys)
+# Option 1: Push to main branch (auto-deploys)
 git push origin main
+
+# Option 2: Manual deploy
+vercel --prod
 ```
 
 ---
 
-## API Endpoints
+## 6. How Builds Work on Vercel
 
-All API endpoints are serverless functions in `/api`:
+### Build Process Flow
 
-- `POST /api/send-report` - Send assessment results via email OR download PDF
-  - Query param: `?download=true` returns PDF blob
-  - Query param: `?download=false` (default) sends email with PDF
-- `GET /api/get-questions` - Get assessment questions
-- `POST /api/save-lead` - Save lead information
+1. **Clone Repository**
+   - Vercel clones your GitHub repo
 
-### Serverless Function Count Limit
+2. **Install Phase** (runs `installCommand`)
+   ```bash
+   cd frontend && npm ci
+   ```
 
-Vercel has a 12 serverless function limit on free tier.
+3. **Build Phase** (runs `buildCommand`)
+   ```bash
+   cd frontend && npm ci && npm run build
+   ```
+   - Compiles TypeScript
+   - Bundles React app with Vite
+   - Outputs to `frontend/dist/`
 
-**Our strategy:** Consolidate related functionality
-- ✅ `send-report.ts` handles BOTH email sending AND PDF downloads (via query param)
-- ❌ Don't create separate `download-pdf.ts` endpoint
+4. **Deploy Phase**
+   - Static files from `frontend/dist/` → Vercel CDN
+   - API functions from `api/*.ts` → Serverless (automatic)
+   - Helper functions in `api/_lib/` → Bundled with serverless functions
 
 ---
 
-## Troubleshooting
+## 7. API Endpoints
 
-### Build fails with "command not found"
+### Current Endpoints (5 total)
 
-**Problem:** Build command can't find `vite` or other frontend tools
+1. **`POST /api/send-report`** - Send assessment results
+   - With `?download=true`: Returns PDF blob
+   - Without query param: Sends email with PDF attachment
 
-**Solution:** Ensure `buildCommand` navigates to frontend first:
+2. **`GET /api/get-questions`** - Get assessment questions
+
+3. **`POST /api/save-lead`** - Save lead information to database
+
+4. *(Available for 2 more endpoints)*
+
+### Endpoint Consolidation Strategy
+
+**DO NOT create separate endpoints for related functionality.**
+
+✅ **GOOD:** Single endpoint with query params
+```typescript
+// /api/send-report.ts
+const isDownload = req.query.download === 'true';
+if (isDownload) {
+  return pdfBlob;
+} else {
+  sendEmail();
+}
+```
+
+❌ **BAD:** Multiple endpoints
+```typescript
+// /api/download-pdf.ts  ❌
+// /api/send-email.ts    ❌
+```
+
+---
+
+## 8. Database Connection
+
+### Connection String Format
+
+```bash
+DATABASE_URL=postgres://[user]:[password]@[host]:6543/[database]?sslmode=require
+```
+
+### Important Rules
+
+1. **Always use port `6543`** (transaction pooler)
+   - Serverless functions need pooling
+   - Port `5432` is for direct connections only
+
+2. **URL-encode special characters in password**
+   - Example: `p@ssw0rd!` → `p%40ssw0rd%21`
+
+3. **Include `?sslmode=require`** for secure connections
+
+4. **Use `pg` library for connections**
+   ```typescript
+   import { Pool } from 'pg';
+   const pool = new Pool({
+     connectionString: process.env.DATABASE_URL,
+   });
+   ```
+
+---
+
+## 9. Troubleshooting
+
+### Build Fails: "npm ci can only install packages when package.json and package-lock.json are in sync"
+
+**Problem:** package-lock.json out of sync with package.json
+
+**Solution:**
+```bash
+cd frontend
+rm package-lock.json
+npm install
+git add package-lock.json
+git commit -m "Regenerate package-lock.json"
+git push
+```
+
+### Build Fails: "command not found: vite"
+
+**Problem:** Build command not in frontend directory
+
+**Solution:** Verify `vercel.json` has:
 ```json
 "buildCommand": "cd frontend && npm ci && npm run build"
 ```
 
-### Build fails with "Could not parse File as JSON"
+### Serverless Functions Not Deploying
 
-**Problem:** Malformed JSON in `vercel.json` or `package.json`
+**Problem:** Files in wrong location or wrong naming
 
 **Solution:**
-1. Validate JSON: https://jsonlint.com/
-2. Check for:
-   - Duplicate keys
-   - Missing commas
-   - Unclosed brackets/braces
-   - Trailing commas (not allowed in JSON)
+- Files must be in `/api` directory (not subdirectories)
+- Files must have `.ts` or `.js` extension
+- Files must export default function
+- Helper files should be in `/api/_lib/`
 
-### Functions don't deploy
+### Database Connection Errors
 
-**Problem:** Changes to `api/` files not deploying
+**Problem:** Wrong port or URL encoding
 
-**Solution:** Vercel auto-deploys all `.ts` files in `api/` directory. Check:
-1. File is in `api/` directory
-2. File exports default function
-3. Function matches Vercel serverless signature
-
----
-
-## File Naming Conventions
-
-### API Functions (`/api`)
-- **Lowercase with hyphens:** `send-report.ts`, `get-questions.ts`
-- **Export default handler:**
-  ```typescript
-  export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // ...
-  }
-  ```
-
-### Frontend (`/frontend`)
-- React components: **PascalCase** (`AssessmentForm.tsx`)
-- Utilities: **camelCase** (`utils/formatDate.ts`)
+**Solution:**
+1. Check port is `6543` (not `5432`)
+2. URL-encode special characters in password
+3. Verify `sslmode=require` is included
 
 ---
 
 ## Version Information
 
-- **Node.js:** 20.x (specified in `package.json` engines)
+- **Node.js:** 20.x
 - **React:** 18.2.0
 - **Vite:** 5.4.0
 - **TypeScript:** 5.3.3
-- **Vercel Node Runtime:** @vercel/node 3.0.11
+- **PostgreSQL:** Compatible with Supabase
+
+---
+
+## Important Reminders
+
+1. **DO NOT modify `vercel.json` without updating this guide**
+2. **DO NOT add more than 5 files to `/api` directory**
+3. **ALWAYS use port `6543` for database connections**
+4. **ALWAYS URL-encode special characters in `DATABASE_URL`**
+5. **ALWAYS commit `frontend/package-lock.json`**
 
 ---
 
@@ -381,8 +402,9 @@ Vercel has a 12 serverless function limit on free tier.
 If Claude Code or another AI assistant tries to modify the build configuration:
 
 1. **Point them to this guide**
-2. **Verify changes against this document**
-3. **Update this guide if requirements change**
+2. **Verify changes against Section 2 (vercel.json)**
+3. **Ensure they don't break the 5-endpoint limit**
+4. **Update this guide if requirements change**
 
 **This guide is the SINGLE SOURCE OF TRUTH for build configuration.**
 
