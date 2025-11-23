@@ -47,7 +47,7 @@
   "buildCommand": "cd frontend && npm run build",
   "outputDirectory": "frontend/dist",
   "framework": null,
-  "installCommand": "cd frontend && npm ci",
+  "installCommand": "cd frontend && npm ci --include=dev",
   "env": {
     "NODE_ENV": "production"
   },
@@ -104,6 +104,7 @@
   - We explicitly control the build process
 
 - **`installCommand`**: Install frontend dependencies separately
+  - `--include=dev` ensures devDependencies are installed (vite is a devDependency!)
   - Runs before buildCommand
   - Ensures reproducible builds with package-lock.json
 
@@ -143,7 +144,15 @@ HUBSPOT_API_KEY=your-hubspot-key
 
 ## 4. Common Mistakes to Avoid
 
-### ❌ MISTAKE 1: Running npm ci in buildCommand
+### ❌ MISTAKE 1: Missing --include=dev flag
+```json
+// WRONG - Don't do this:
+"installCommand": "cd frontend && npm ci"
+```
+**Why:** Vercel may omit devDependencies by default, but vite is in devDependencies!
+**Fix:** Use `npm ci --include=dev` to ensure build tools are installed.
+
+### ❌ MISTAKE 2: Running npm ci in buildCommand
 ```json
 // WRONG - Don't do this:
 "buildCommand": "cd frontend && npm ci && npm run build"
@@ -151,7 +160,7 @@ HUBSPOT_API_KEY=your-hubspot-key
 **Why:** installCommand already runs npm ci. Running it twice is redundant and can cause issues.
 **Fix:** buildCommand should only run `npm run build`.
 
-### ❌ MISTAKE 2: Adding more than 5 files in /api folder
+### ❌ MISTAKE 3: Adding more than 5 files in /api folder
 ```
 api/
 ├── endpoint1.ts
@@ -164,7 +173,7 @@ api/
 **Why:** Vercel free tier has 12 serverless function limit.
 **Fix:** Move helper functions to `api/_lib/` (underscore prefix = not counted).
 
-### ❌ MISTAKE 3: Forgetting to URL-encode DATABASE_URL
+### ❌ MISTAKE 4: Forgetting to URL-encode DATABASE_URL
 ```bash
 # WRONG:
 DATABASE_URL=postgres://user:p@ssw0rd!@host:5432/db
@@ -175,7 +184,7 @@ DATABASE_URL=postgres://user:p%40ssw0rd%21@host:6543/db
 **Why:** Special characters break connection string parsing.
 **Fix:** URL-encode: `@` → `%40`, `!` → `%21`, etc.
 
-### ❌ MISTAKE 4: Using port 5432 instead of 6543
+### ❌ MISTAKE 5: Using port 5432 instead of 6543
 ```bash
 # WRONG (direct connection):
 DATABASE_URL=postgres://user:pass@host:5432/db
@@ -186,7 +195,7 @@ DATABASE_URL=postgres://user:pass@host:6543/db
 **Why:** Serverless functions need transaction pooling (port 6543), not direct connections (5432).
 **Fix:** Always use port `6543` for Supabase/PostgreSQL in serverless.
 
-### ❌ MISTAKE 5: Missing package-lock.json
+### ❌ MISTAKE 6: Missing package-lock.json
 ```bash
 cd frontend
 ls package-lock.json  # Must exist!
@@ -246,8 +255,10 @@ vercel --prod
 
 2. **Install Phase** (runs `installCommand`)
    ```bash
-   cd frontend && npm ci
+   cd frontend && npm ci --include=dev
    ```
+   - Installs both production and dev dependencies
+   - Dev dependencies include vite (needed for build)
 
 3. **Build Phase** (runs `buildCommand`)
    ```bash
