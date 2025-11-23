@@ -49,6 +49,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
+  // Check if this is a download request
+  const isDownload = req.query.download === 'true';
+
   try {
     // Validate request body
     const requestData: SendReportRequest = req.body;
@@ -113,7 +116,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log('PDF generated successfully');
     } catch (pdfError: any) {
       console.error('PDF generation failed:', pdfError);
-      // Continue without PDF - email will still be sent
+      // For download mode, this is a critical error
+      if (isDownload) {
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to generate PDF',
+          details: pdfError.message,
+        });
+      }
+      // For email mode, continue without PDF - email will still be sent
+    }
+
+    // If download mode, return PDF as downloadable blob
+    if (isDownload) {
+      if (!pdfBase64) {
+        return res.status(500).json({
+          success: false,
+          error: 'PDF generation failed',
+        });
+      }
+
+      // Convert base64 to buffer
+      const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+
+      // Set headers for file download
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="AI-Readiness-Assessment-Report.pdf"');
+      res.setHeader('Content-Length', pdfBuffer.length);
+
+      return res.status(200).send(pdfBuffer);
     }
 
     // Send email via Microsoft Graph with PDF attachment
