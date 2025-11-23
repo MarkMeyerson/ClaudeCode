@@ -386,7 +386,7 @@ const ResultsPage: React.FC = () => {
                 Discuss your results with our AI experts and create a customized roadmap.
               </p>
               <a
-                href="https://book.sherpatech.ai"
+                href="http://book.sherpatech.ai"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block w-full btn btn-primary bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"

@@ -145,6 +145,9 @@ export const getPhaseByScore = (totalScore: number): PhaseInfo => {
 export const calculateAssessmentScore = (
   responses: Array<{ questionId: string; value: number; dimension: string }>
 ): AssessmentScore => {
+  console.log('[DEBUG SCORING] Input responses:', JSON.stringify(responses));
+  console.log('[DEBUG SCORING] Number of responses:', responses.length);
+
   // Calculate scores for each dimension
   const dimensions = [
     'strategic_clarity',
@@ -159,6 +162,12 @@ export const calculateAssessmentScore = (
     const score = dimensionResponses.reduce((sum, r) => sum + r.value, 0);
     const maxScore = 20;
 
+    console.log(`[DEBUG SCORING] ${dimension}:`, {
+      numResponses: dimensionResponses.length,
+      responses: dimensionResponses.map(r => ({ id: r.questionId, value: r.value })),
+      totalScore: score
+    });
+
     return {
       dimension,
       score,
@@ -172,10 +181,15 @@ export const calculateAssessmentScore = (
   const maxTotalScore = 100;
   const percentage = Math.round((totalScore / maxTotalScore) * 100);
 
+  console.log('[DEBUG SCORING] Total score:', totalScore);
+  console.log('[DEBUG SCORING] Percentage:', percentage);
+
   // Determine readiness phase
   const phase = getPhaseByScore(totalScore);
 
-  return {
+  console.log('[DEBUG SCORING] Readiness phase:', phase.name);
+
+  const result = {
     dimensionScores,
     totalScore,
     maxTotalScore,
@@ -184,4 +198,8 @@ export const calculateAssessmentScore = (
     phaseDescription: phase.description,
     recommendations: phase.recommendations
   };
+
+  console.log('[DEBUG SCORING] Final result:', JSON.stringify(result));
+
+  return result;
 };

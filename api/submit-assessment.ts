@@ -56,6 +56,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const assessmentId = (req.query.id as string) || req.body.assessmentId;
     const { responses, answers } = req.body;
 
+    console.log('[DEBUG] Submit Assessment - Start');
+    console.log('[DEBUG] Assessment ID:', assessmentId);
+    console.log('[DEBUG] Request body keys:', Object.keys(req.body));
+    console.log('[DEBUG] Responses received:', JSON.stringify(responses || answers));
+
     // Validate assessment ID
     if (!assessmentId) {
       return res.status(400).json({
@@ -68,11 +73,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const assessmentData = responses || answers;
 
     if (!assessmentData) {
+      console.error('[DEBUG] No assessment data received!');
       return res.status(400).json({
         success: false,
         message: 'Assessment data is required'
       });
     }
+
+    console.log('[DEBUG] Assessment data type:', Array.isArray(assessmentData) ? 'array' : 'object');
+    console.log('[DEBUG] Assessment data length/keys:', Array.isArray(assessmentData) ? assessmentData.length : Object.keys(assessmentData).length);
 
     // Calculate scores (use mock if database fails)
     let assessmentScore;
@@ -93,10 +102,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }));
       }
 
+      console.log('[DEBUG] Responses array for scoring:', JSON.stringify(responsesArray));
       assessmentScore = calculateAssessmentScore(responsesArray);
+      console.log('[DEBUG] Calculated scores:', JSON.stringify(assessmentScore));
     } catch (scoringError) {
+      console.error('[DEBUG] Scoring calculation FAILED:', scoringError);
       console.warn('Scoring calculation failed, using mock scores:', scoringError);
       assessmentScore = calculateMockScore(assessmentData);
+      console.log('[DEBUG] Using mock scores instead:', JSON.stringify(assessmentScore));
     }
 
     // Try to save to database, but don't fail if it doesn't work
