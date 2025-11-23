@@ -30,12 +30,9 @@ export const getPool = (): Pool => {
 
 export const query = async (text: string, params?: any[]): Promise<any> => {
   const pool = getPool();
-  const start = Date.now();
 
   try {
     const res = await pool.query(text, params);
-    const duration = Date.now() - start;
-    console.log('Executed query', { duration, rows: res.rowCount });
     return res;
   } catch (error) {
     console.error('Database query error:', error);

@@ -1,7 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders } from './lib/cors';
-import { calculateAssessmentScore, DimensionScore } from './lib/scoring';
-import { query } from './lib/db';
+import { setCorsHeaders } from './_lib/cors';
+import { calculateAssessmentScore, DimensionScore } from './_lib/scoring';
+import { query } from './_lib/db';
 
 // Mock scoring function in case database fails
 function calculateMockScore(responses: any) {
