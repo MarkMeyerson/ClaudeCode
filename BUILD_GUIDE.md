@@ -44,7 +44,7 @@
 
 ```json
 {
-  "buildCommand": "cd frontend && npm ci && npm run build",
+  "buildCommand": "cd frontend && npm run build",
   "outputDirectory": "frontend/dist",
   "framework": null,
   "installCommand": "cd frontend && npm ci",
@@ -95,8 +95,7 @@
 
 - **`buildCommand`**: Only builds frontend (serverless functions auto-deploy)
   - `cd frontend` - Navigate to frontend directory
-  - `npm ci` - Clean install from package-lock.json
-  - `npm run build` - Runs Vite build
+  - `npm run build` - Runs Vite build (dependencies already installed by installCommand)
 
 - **`outputDirectory`**: `frontend/dist` - Where Vite outputs built files
 
@@ -144,13 +143,13 @@ HUBSPOT_API_KEY=your-hubspot-key
 
 ## 4. Common Mistakes to Avoid
 
-### ❌ MISTAKE 1: Running npm ci in root during build
+### ❌ MISTAKE 1: Running npm ci in buildCommand
 ```json
 // WRONG - Don't do this:
-"buildCommand": "npm ci && cd frontend && npm ci && npm run build"
+"buildCommand": "cd frontend && npm ci && npm run build"
 ```
-**Why:** Root package.json only contains API dependencies (installed by Vercel automatically).
-**Fix:** Only run `npm ci` in frontend directory.
+**Why:** installCommand already runs npm ci. Running it twice is redundant and can cause issues.
+**Fix:** buildCommand should only run `npm run build`.
 
 ### ❌ MISTAKE 2: Adding more than 5 files in /api folder
 ```
@@ -252,7 +251,7 @@ vercel --prod
 
 3. **Build Phase** (runs `buildCommand`)
    ```bash
-   cd frontend && npm ci && npm run build
+   cd frontend && npm run build
    ```
    - Compiles TypeScript
    - Bundles React app with Vite
