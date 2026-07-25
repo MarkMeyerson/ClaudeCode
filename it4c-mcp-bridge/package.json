@@ -1,0 +1,30 @@
+{
+  "name": "it4c-mcp-bridge",
+  "version": "0.1.0",
+  "description": "Read-only MCP bridge to the IT4Causes Microsoft 365 tenant (mail, calendar, Teams, SharePoint) via Microsoft Graph delegated auth. Optional Trello tools.",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "it4c-mcp-bridge": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "login": "node dist/login.js",
+    "smoke": "node dist/smoke.js",
+    "start": "node dist/index.js",
+    "dev": "tsc && node dist/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^2.16.2",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  }
+}
